@@ -65,7 +65,6 @@ partial class FrmMain
 		// ClbPlugins
 		// 
 		ClbPlugins.Dock = DockStyle.Fill;
-		ClbPlugins.FormattingEnabled = true;
 		ClbPlugins.Location = new Point(3, 3);
 		ClbPlugins.Name = "ClbPlugins";
 		ClbPlugins.Size = new Size(634, 399);

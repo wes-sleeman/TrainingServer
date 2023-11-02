@@ -74,7 +74,7 @@ public partial class FrmMain : Form
 			await Task.Delay(100);
 			await socket.SendAsync(symKeyCrypt);
 
-			if (transcoder.SecureUnpack(await socket.InterceptNextTextAsync()).Data is not JsonArray ja || ja.Any())
+			if (transcoder.SecureUnpack(await socket.InterceptNextTextAsync()).Data is not JsonArray ja || ja.Count != 0)
 				// Tunnel establishment handshake failed. Purge the server.
 				await socket.DisposeAsync(WebSocketCloseStatus.ProtocolError, "Handshake failed.");
 
@@ -96,7 +96,7 @@ public partial class FrmMain : Form
 			{
 				var (date, recipient, text) = transcoder.SecureUnpack(msg);
 
-				if (text.Deserialize<NetworkMessage>() is NetworkMessage netmsg)
+				if (text.Deserialize<NetworkMessage>(JsonSerializerOptions.Default) is NetworkMessage netmsg)
 					await server.MessageReceivedAsync(netmsg);
 			};
 
@@ -104,7 +104,7 @@ public partial class FrmMain : Form
 			{
 				string sender, recipient;
 
-				switch (server.ResolveGuid(txt.To))
+				switch (server.ResolveGuid(txt.From))
 				{
 					case Controller c:
 						sender = c.Metadata.Callsign;
@@ -120,7 +120,7 @@ public partial class FrmMain : Form
 
 				if (FrequencyGuidRegex().IsMatch(txt.To.ToString()))
 					recipient =
-						decimal.Parse(FrequencyGuidRegex().Match(txt.To.ToString()).Groups[1].Value)
+						(decimal.Parse(FrequencyGuidRegex().Match(txt.To.ToString()).Groups[1].Value) / 1000m)
 							   .ToString("000.00#");
 				else if (server.ResolveGuid(txt.To) is Controller c)
 					recipient = c.Metadata.Callsign;
@@ -137,6 +137,19 @@ public partial class FrmMain : Form
 
 			server.OnAircraftUpdated += Server_OnAircraftUpdated;
 
+			// Register new controllers and send authoritative updates.
+			server.OnControllerAdded += async g =>
+			{
+				transcoder.RegisterSecondaryRecipient(g, guid);
+				await socket.SendAsync(transcoder.SecurePack(guid, g, new AuthoritativeUpdate(
+					g,
+					server.Controllers.Select(kvp => new ControllerUpdate(kvp.Key, kvp.Value)).ToArray(),
+					server.Aircraft.Select(kvp => new AircraftUpdate(kvp.Key, kvp.Value)).ToArray()
+				)));
+			};
+
+			server.OnControllerUpdated += Server_OnControllerUpdated;
+
 			await PollPluginsAsync();
 		}
 		catch (WebSocketException) { }
@@ -144,9 +157,17 @@ public partial class FrmMain : Form
 		await socket!.DisposeAsync(WebSocketCloseStatus.NormalClosure, "Good day!");
 	}
 
+	private async void Server_OnControllerUpdated(ControllerUpdate delta)
+	{
+		if (socket is null || transcoder is null)
+			return;
+
+		await socket.SendAsync(transcoder.SecurePack(guid, guid, delta));
+	}
+
 	private async void Server_OnAircraftUpdated(AircraftUpdate[] delta)
 	{
-		if (socket is null || transcoder is null || !socket.IsConnected)
+		if (socket is null || transcoder is null)
 			return;
 
 		foreach (var update in delta)
@@ -157,7 +178,7 @@ public partial class FrmMain : Form
 	{
 		DateTimeOffset lastRun = DateTimeOffset.Now;
 
-		while (socket?.IsConnected ?? false)
+		while (socket is not null)
 		{
 			TimeSpan delta = DateTimeOffset.Now - lastRun;
 			lastRun = DateTimeOffset.Now;
@@ -169,8 +190,8 @@ public partial class FrmMain : Form
 
 	private void FrmMain_FormClosing(object sender, FormClosingEventArgs e)
 	{
-		if (BtnStart.Text == "Disconnect")
-			socket?.DisposeAsync(WebSocketCloseStatus.NormalClosure, "Good day!").AsTask().RunSynchronously();
+		if (BtnStart.Text == "Disconnect" && socket is not null)
+			Task.Run(async () => await socket.DisposeAsync(WebSocketCloseStatus.NormalClosure, "Good day!")).RunSynchronously();
 	}
 
 	private void Manager_OnPluginsListUpdated()

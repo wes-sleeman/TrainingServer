@@ -14,7 +14,7 @@ using TrainingServer.Networking;
 public class ConnectionManager
 {
 	private readonly ConcurrentDictionary<Guid, WebsocketMonitor> _monitors = new();
-	private readonly ConcurrentBag<ServerInfo> _servers = new();
+	private readonly ConcurrentDictionary<Guid, ServerInfo> _servers = new();
 	private readonly Transcoder _transcoder = new();
 
 	/// <summary>Accepts an incoming client websocket connection and establishes a secure tunnel.</summary>
@@ -40,7 +40,7 @@ public class ConnectionManager
 					var (sent, recipient, data) = _transcoder.SecureUnpack(msg);
 
 					if (_monitors.TryGetValue(recipient, out var rSock))
-						await rSock.SendAsync(_transcoder.SecurePack(server, recipient, msg));
+						await rSock.SendAsync(_transcoder.SecurePack(server, recipient, data));
 				};
 
 				await blocker;
@@ -76,16 +76,16 @@ public class ConnectionManager
 			// Perform the handshake to setup encryption.
 			Task blocker = monitor.MonitorAsync();
 			await SetupAsync(guid);
-			_servers.Add(new(guid, _transcoder.SecureUnpack(await monitor.InterceptNextTextAsync()).Data.ToString()));
+			_servers.TryAdd(guid, new(guid, _transcoder.SecureUnpack(await monitor.InterceptNextTextAsync()).Data.ToString()));
 
 			monitor.OnTextMessageReceived += async msg =>
 			{
 				var (sent, recipient, data) = _transcoder.SecureUnpack(msg);
 
 				if (recipient == guid)
-					await Task.WhenAll(_monitors.Where(kvp => kvp.Key != guid).AsParallel().Select(kvp => kvp.Value.SendAsync(_transcoder.SecurePack(guid, recipient, msg))));
+					await Task.WhenAll(_monitors.Where(kvp => kvp.Key != guid).AsParallel().Select(kvp => kvp.Value.SendAsync(_transcoder.SecurePack(guid, kvp.Key, data))));
 				else if (_monitors.TryGetValue(recipient, out var rSock))
-					await rSock.SendAsync(_transcoder.SecurePack(guid, recipient, msg));
+					await rSock.SendAsync(_transcoder.SecurePack(guid, recipient, data));
 			};
 
 			await blocker;
@@ -99,17 +99,20 @@ public class ConnectionManager
 		}
 		catch (WebSocketException) { }
 
+		_servers.Remove(guid, out _);
+
 		if (_monitors.TryRemove(guid, out var m))
 			await m.DisposeAsync();
 	}
 
-	public IEnumerable<ServerInfo> ListServers() => _servers.AsEnumerable();
+	public IEnumerable<ServerInfo> ListServers() => _servers.Values;
 
 	private async Task SetupAsync(Guid guid)
 	{
 		// Establish a tunnel.
 		var socket = _monitors[guid];
 		var key = _transcoder.GetAsymmetricKey();
+		await Task.Delay(100);
 		_ = socket.SendAsync(guid.ToString() + '|' + Convert.ToBase64String(key.Modulus!) + '|' + Convert.ToBase64String(key.Exponent!));
 
 		byte[] symKeyCrypt = (await socket.InterceptNextBinaryAsync())[..256];

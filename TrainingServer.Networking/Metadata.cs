@@ -15,6 +15,7 @@ public record struct ServerInfo(Guid Guid, string ReadableName) { }
 [JsonDerivedType(typeof(KillMessage), '!')]
 public abstract record NetworkMessage() { }
 
+[method: JsonConstructor()]
 public abstract record UserUpdate(Guid User, UserUpdate.UpdatedField Update) : NetworkMessage
 {
 	[Flags]
@@ -29,6 +30,7 @@ public abstract record UserUpdate(Guid User, UserUpdate.UpdatedField Update) : N
 }
 
 /// <summary>Packed update information about a state change to an aircraft.</summary>
+[method: JsonConstructor()]
 public record AircraftUpdate(Guid Aircraft, UserUpdate.UpdatedField Update, FlightData? Metadata, AircraftSnapshot? State, AircraftMotion? Movement) : UserUpdate(Aircraft, Update)
 {
 	public AircraftUpdate(Guid aircraft, FlightData? metadata = null, AircraftSnapshot? state = null, AircraftMotion? movement = null) : this(aircraft, (metadata is null ? 0 : UpdatedField.Metadata) | (state is null ? 0 : UpdatedField.State) | (movement is null ? 0 : UpdatedField.Movement), metadata, state, movement) { }
@@ -99,19 +101,75 @@ public record AircraftUpdate(Guid Aircraft, UserUpdate.UpdatedField Update, Flig
 }
 
 /// <summary>Packed update information about a state change to a controller.</summary>
+[method: JsonConstructor()]
 public record ControllerUpdate(Guid Controller, UserUpdate.UpdatedField Update, ControllerData? Metadata, ControllerSnapshot? State) : UserUpdate(Controller, Update)
 {
 	public ControllerUpdate(Guid controller, ControllerData? metadata = null, ControllerSnapshot? state = null) : this(controller, (metadata is null ? 0 : UpdatedField.Metadata) | (state is null ? 0 : UpdatedField.State), metadata, state) { }
 
 	public ControllerUpdate(Guid controller, Controller info) : this(controller, info.Metadata, info.Position) { }
+
+	/// <summary>Combines two <see cref="ControllerUpdate"/>s, using the <see cref="Guid"/> from the left.</summary>
+	public static ControllerUpdate operator +(ControllerUpdate left, ControllerUpdate right)
+	{
+		if (right.Update.HasFlag(UpdatedField.Delete))
+			return new(left.Controller, UpdatedField.Delete, null, null);
+
+		if (left.Update.HasFlag(UpdatedField.Delete))
+			return right with { Controller = left.Controller };
+
+		ControllerUpdate newUpdate = left;
+
+		if (right.Update.HasFlag(UpdatedField.Metadata))
+			newUpdate = newUpdate with { Metadata = right.Metadata, Update = newUpdate.Update | UpdatedField.Metadata };
+
+		if (right.Update.HasFlag(UpdatedField.State))
+			newUpdate = newUpdate with { State = right.State, Update = newUpdate.Update | UpdatedField.State };
+
+		return newUpdate;
+	}
+
+	/// <summary>Updates an <see cref="Extensibility.Controller"/> from the given <see cref="ControllerUpdate"/>.</summary>
+	public static Controller operator +(Controller ac, ControllerUpdate update)
+	{
+		if (update.Update.HasFlag(UpdatedField.Delete))
+			throw new ArgumentException("Cannot delete an Controller with application.", nameof(update));
+
+		if (update.Update.HasFlag(UpdatedField.Metadata))
+			ac = ac with { Metadata = update.Metadata!.Value };
+
+		if (update.Update.HasFlag(UpdatedField.State))
+			ac = ac with { Position = update.State!.Value };
+
+		return ac;
+	}
+
+	/// <summary>Finds the difference between two <see cref="Extensibility.Controller"/>.</summary>
+	public static ControllerUpdate Difference(Guid ControllerId, Controller from, Controller to)
+	{
+		ControllerUpdate newUpdate = new(ControllerId);
+
+		if (from.Metadata != to.Metadata)
+			newUpdate = newUpdate with { Metadata = to.Metadata, Update = newUpdate.Update | UpdatedField.Metadata };
+
+		if (from.Position != to.Position)
+			newUpdate = newUpdate with { State = to.Position, Update = newUpdate.Update | UpdatedField.State };
+
+		return newUpdate;
+	}
+
+	public Controller ToController() => new(Metadata ?? new(), State ?? new());
 }
 
-public record AuthoritativeUpdate(Guid Recipient, UserUpdate[] Updates) : UserUpdate(Recipient, UpdatedField.Metadata | UpdatedField.State | UpdatedField.Movement) { }
+[method: JsonConstructor()]
+public record AuthoritativeUpdate(Guid Recipient, ControllerUpdate[] Controllers, AircraftUpdate[] Aircraft) : UserUpdate(Recipient, UpdatedField.Metadata | UpdatedField.State | UpdatedField.Movement) { }
 
 public abstract record ControlMessage(Guid To) : NetworkMessage { }
 
+[method: JsonConstructor()]
 public record TextMessage(Guid From, Guid To, string Message) : ControlMessage(To) { }
 
+[method: JsonConstructor()]
 public record ChannelMessage(Guid From, decimal Frequency, string Message) : TextMessage(From, Guid.Parse($"{Frequency * 1000:00000000}-0000-0000-0000-000000000000"), Message) { }
 
+[method: JsonConstructor()]
 public record KillMessage(Guid Victim) : ControlMessage(Victim) { }

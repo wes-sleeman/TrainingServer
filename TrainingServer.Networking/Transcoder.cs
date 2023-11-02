@@ -37,7 +37,7 @@ public class Transcoder
 	/// <param name="key">The symmetric AES key securing the tunnel.</param>
 	public void RegisterKey(Guid recipient, byte[] key)
 	{
-		_symmetricKeys ??= new();
+		_symmetricKeys ??= [];
 
 		_symmetricKeys[recipient] = Aes.Create();
 		_symmetricKeys[recipient].Key = key;
@@ -48,7 +48,7 @@ public class Transcoder
 	/// <param name="key">The symmetric AES key securing the tunnel.</param>
 	public void RegisterSecondaryRecipient(Guid recipient, Guid relay)
 	{
-		_symmetricKeys ??= new();
+		_symmetricKeys ??= [];
 
 		_symmetricKeys[recipient] = _symmetricKeys[relay];
 	}
@@ -79,7 +79,7 @@ public class Transcoder
 
 		crypt.GenerateIV();
 
-		return crypt.IV.Concat(crypt.EncryptCbc(data, crypt.IV)).ToArray();
+		return [..crypt.IV, ..crypt.EncryptCbc(data, crypt.IV)];
 	}
 
 	/// <summary>Decrypts a text message received through an encrypted tunnel.</summary>

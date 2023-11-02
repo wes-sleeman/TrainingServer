@@ -44,60 +44,64 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 		CancellationToken cancellationToken = _kill.Token;
 		var buffer = new byte[1024 * 4];
 		string messageText = "";
-		List<byte> messageBuffer = new();
+		List<byte> messageBuffer = [];
 		var receiveResult = await _connection.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
 
-		while (!cancellationToken.IsCancellationRequested && !receiveResult.CloseStatus.HasValue)
+		try
 		{
-			if (receiveResult.MessageType == WebSocketMessageType.Text || !string.IsNullOrEmpty(messageText))
+			while (!cancellationToken.IsCancellationRequested && !receiveResult.CloseStatus.HasValue)
 			{
-				messageText += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
-
-				if (receiveResult.EndOfMessage)
+				if (receiveResult.MessageType == WebSocketMessageType.Text || !string.IsNullOrEmpty(messageText))
 				{
-					if (InterceptSingleText is not null)
-						InterceptSingleText.Invoke(messageText);
-					else if (OnTextMessageReceived is not null)
-						OnTextMessageReceived.Invoke(messageText);
-					else
+					messageText += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+
+					if (receiveResult.EndOfMessage)
 					{
-						while (InterceptSingleText is null)
-							Thread.Yield();
+						if (InterceptSingleText is not null)
+							InterceptSingleText.Invoke(messageText);
+						else if (OnTextMessageReceived is not null)
+							OnTextMessageReceived.Invoke(messageText);
+						else
+						{
+							while (InterceptSingleText is null)
+								Thread.Yield();
 
-						InterceptSingleText.Invoke(messageText);
+							InterceptSingleText.Invoke(messageText);
+						}
+
+						InterceptSingleText = null;
+
+						messageText = "";
 					}
-
-					InterceptSingleText = null;
-
-					messageText = "";
 				}
-			}
-			else
-			{
-				messageBuffer.AddRange(buffer);
-
-				if (receiveResult.EndOfMessage)
+				else
 				{
-					if (InterceptSingleBinary is not null)
-						InterceptSingleBinary.Invoke(messageBuffer.ToArray());
-					else if (OnBinaryMessageReceived is not null)
-						OnBinaryMessageReceived.Invoke(messageBuffer.ToArray());
-					else
+					messageBuffer.AddRange(buffer);
+
+					if (receiveResult.EndOfMessage)
 					{
-						while (InterceptSingleBinary is null)
-							Thread.Yield();
+						if (InterceptSingleBinary is not null)
+							InterceptSingleBinary.Invoke([..messageBuffer]);
+						else if (OnBinaryMessageReceived is not null)
+							OnBinaryMessageReceived.Invoke([..messageBuffer]);
+						else
+						{
+							while (InterceptSingleBinary is null)
+								Thread.Yield();
 
-						InterceptSingleBinary.Invoke(messageBuffer.ToArray());
+							InterceptSingleBinary.Invoke([..messageBuffer]);
+						}
+
+						InterceptSingleBinary = null;
+
+						messageBuffer.Clear();
 					}
-
-					InterceptSingleBinary = null;
-
-					messageBuffer.Clear();
 				}
-			}
 
-			receiveResult = await _connection.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+				receiveResult = await _connection.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+			}
 		}
+		catch (WebSocketException) { /* Client died. */ }
 
 		await DisposeAsync();
 	}
@@ -107,7 +111,6 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 	/// </summary>
 	/// <param name="data">The message to send.</param>
 	public Task SendAsync(string data) => SendAsync(Encoding.UTF8.GetBytes(data), WebSocketMessageType.Text);
-
 
 	/// <summary>
 	/// Sends a message to the connected client.
@@ -135,7 +138,7 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 	public async Task<byte[]> InterceptNextBinaryAsync()
 	{
 		SemaphoreSlim breaker = new(0);
-		byte[] result = Array.Empty<byte>();
+		byte[] result = [];
 
 		InterceptSingleBinary = m => { result = m; breaker.Release(); };
 		await breaker.WaitAsync();

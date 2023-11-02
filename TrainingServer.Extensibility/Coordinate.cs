@@ -264,7 +264,7 @@ public record struct Coordinate(float Latitude, float Longitude)
 	public static Coordinate operator /(Coordinate left, float right) =>
 		new(Math.Clamp(left.Latitude / right, -90f, 90), Math.Clamp(left.Longitude / right, -180f, 180));
 
-	public override readonly string ToString() => $"({Math.Round(Math.Abs(Latitude), 2)}, {Math.Round(Math.Abs(Longitude), 2)})";
+	public override readonly string ToString() => $"({Math.Round(Latitude, 2)}, {Math.Round(Longitude, 2)})";
 
 	public class CoordinateJsonConverter : JsonConverter<Coordinate>
 	{

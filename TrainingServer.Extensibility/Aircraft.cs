@@ -30,14 +30,27 @@ public record struct AircraftMotion(uint Speed, int ClimbRate, float TurnRate)
 {
 	public AircraftSnapshot Apply(AircraftSnapshot source, TimeSpan duration)
 	{
-		if (TurnRate != 0)
-			throw new NotImplementedException();
+		if (TurnRate == 0)
+			return source with {
+				Heading = (float)duration.TotalSeconds * TurnRate + source.Heading,
+				Altitude = source.Altitude + (int)(ClimbRate * duration.TotalSeconds),
+				Position = source.Position.FixRadialDistance(source.Heading, (float)duration.TotalHours * Speed) 
+			};
+		else
+		{
+			TimeSpan resolution = TimeSpan.FromSeconds(0.25);
+			float hoursPerResolution = (float)(TimeSpan.FromHours(1) / resolution);
 
-		return source with {
-			Heading = (float)duration.TotalSeconds * TurnRate + source.Heading,
-			Altitude = source.Altitude + (int)(ClimbRate * duration.TotalSeconds),
-			Position = source.Position.FixRadialDistance(source.Heading, (float)duration.TotalHours * Speed)
-		};
+			for (int iter = 0; iter < duration / resolution; ++iter)
+			{
+				source = source with { 
+					Position = source.Position.FixRadialDistance(source.Heading, Speed / hoursPerResolution),
+					Heading = source.Heading + (float)(resolution.TotalSeconds * TurnRate),
+				};
+			}
+
+			return source with { Altitude = source.Altitude + (int)(ClimbRate * duration.TotalSeconds) };
+		}
 	}
 }
 

@@ -10,12 +10,18 @@ internal class PluginManager
 {
 	public event Action? OnPluginsListUpdated;
 
-	public HashSet<string> SearchPath = new() { ".", "./plugins" };
+	public HashSet<string> SearchPath = [ ".",
+#if DEBUG
+		"../../../../plugins"
+#else
+		"./plugins"
+#endif
+	];
 	public readonly ConcurrentDictionary<IPlugin, bool> _loadedPlugins = new();
 
 	readonly IServer _managingServer;
 
-	readonly Dictionary<string, DateTime> _loadedPluginTimes = new();
+	readonly Dictionary<string, DateTime> _loadedPluginTimes = [];
 	readonly Dictionary<Type, object> _injectionDict;
 
 	public PluginManager(IServer managingServer)
@@ -43,7 +49,7 @@ internal class PluginManager
 	{
 		while (true)
 		{
-			HashSet<string> locatedDlls = new();
+			HashSet<string> locatedDlls = [];
 
 			// Find _EVERYTHING_.
 			foreach (string path in SearchPath)
@@ -51,7 +57,7 @@ internal class PluginManager
 				if (!Directory.Exists(path))
 					continue;
 
-				locatedDlls.UnionWith(Directory.EnumerateFiles(path, "*.dll", SearchOption.AllDirectories));
+				locatedDlls.UnionWith(Directory.EnumerateFiles(Path.GetFullPath(path), "*.dll", SearchOption.AllDirectories));
 			}
 
 			// Remove anything unmodified since the last sweep.
@@ -67,19 +73,25 @@ internal class PluginManager
 			}
 
 			// Reflect the DLLs into something we can use.
-			HashSet<Type> pluginTypes = new();
+			HashSet<Type> pluginTypes = [];
 
 			foreach (string path in locatedDlls)
 			{
-				Assembly asm = Assembly.LoadFile(path);
+				try
+				{
+					Assembly asm = Assembly.LoadFile(path);
 
-				pluginTypes.UnionWith(asm.GetExportedTypes().Where(et => et.GetInterfaces().Contains(typeof(IPlugin))));
+					pluginTypes.UnionWith(asm.GetExportedTypes().Where(et => et.GetInterfaces().Contains(typeof(IPlugin))));
+				}
+				catch (Exception) { /* Oh so many things can go wrong here! */ }
 			}
+
+			pluginTypes = pluginTypes.DistinctBy(t => t.AssemblyQualifiedName).ToHashSet();
 
 			/// <summary>Generate a plugin from a given <see cref="ConstructorInfo"/>.</summary>
 			IPlugin Instantiate(ConstructorInfo ci)
 			{
-				List<object> paramList = new();
+				List<object> paramList = [];
 				foreach (ParameterInfo pi in ci.GetParameters())
 				{
 					object v = _injectionDict[pi.ParameterType];
@@ -90,13 +102,13 @@ internal class PluginManager
 					paramList.Add(v);
 				}
 
-				return (IPlugin)ci.Invoke(paramList.ToArray());
+				return (IPlugin)ci.Invoke([..paramList]);
 			}
 
-			bool updated = pluginTypes.Any();
+			bool updated = pluginTypes.Count != 0;
 
 			// Instantiate the types while building the injection dictionary.
-			for (int iteration = 0; pluginTypes.Any() && iteration < pluginTypes.Count; ++iteration)
+			for (int iteration = pluginTypes.Count; pluginTypes.Count != 0 && iteration > 0; --iteration)
 			{
 				foreach (Type pluginType in pluginTypes)
 				{
@@ -111,7 +123,7 @@ internal class PluginManager
 				}
 			}
 
-			if (pluginTypes.Any())
+			if (pluginTypes.Count != 0)
 				throw new TypeLoadException("Cannot load plugins due to missing dependencies: " + string.Join(", ", pluginTypes.Select(t => t.FullName)));
 
 			if (updated)

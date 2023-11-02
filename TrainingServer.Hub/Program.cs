@@ -6,8 +6,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<ConnectionManager>();
+builder.Services.AddSingleton<OsmDataProvider>();
 
 var app = builder.Build();
+app.Services.GetRequiredService<OsmDataProvider>();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -43,5 +45,9 @@ app.Use(async (context, next) =>
 });
 
 app.MapGet("/servers", (ConnectionManager manager) => manager.ListServers());
+
+app.MapGet("/geos/nodes", (OsmDataProvider osm) => osm.Nodes.Values);
+app.MapGet("/geos/ways", (OsmDataProvider osm) => osm.Ways.Values);
+app.MapGet("/geos/relations", (OsmDataProvider osm) => osm.Relations.Values);
 
 app.Run();
