@@ -1,9 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
 using System.Diagnostics;
-using System.Drawing;
-using System;
-using System.Text.Json.Serialization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace TrainingServer.Extensibility;
 
@@ -13,6 +11,9 @@ public record struct Coordinate(float Latitude, float Longitude)
 	public readonly Coordinate GetCoordinate() => this;
 
 	public Coordinate(double latitude, double longitude) : this((float)latitude, (float)longitude) { }
+
+	[JsonConstructor()]
+	internal Coordinate(float[] parts) : this(parts[0], parts[1]) { }
 
 	public Coordinate(string coordData) : this(0, 0)
 	{
@@ -49,8 +50,6 @@ public record struct Coordinate(float Latitude, float Longitude)
 		if (coordData[splitpoint] == 'W')
 			Longitude *= -1;
 	}
-
-	public readonly PointF ToPoint() => new(Longitude, Latitude);
 
 	[JsonIgnore]
 	public readonly string DMS
@@ -234,24 +233,27 @@ public record struct Coordinate(float Latitude, float Longitude)
 	[DebuggerStepThrough]
 	public readonly float DistanceTo(Coordinate other)
 	{
-		const double R = 3440.07;
-		const double DEG_TO_RAD = Math.Tau / 360;
+		const float R = 3440.07f;
+		const float DEG_TO_RAD = (float)(Math.Tau / 360);
 
-		double dlat = (double)(other.Latitude - Latitude) * DEG_TO_RAD,
-			   dlon = (double)(other.Longitude - Longitude) * DEG_TO_RAD;
+		static float fastCos(float rad) => rad < 1 ? 1 - rad * rad / 2 : MathF.Cos(rad);
+		static float fastSin(float rad) => rad < 0.5f ? rad : MathF.Sin(rad);
 
-		double lat1 = (double)Latitude * DEG_TO_RAD,
-			   lat2 = (double)other.Latitude * DEG_TO_RAD;
+		float dlat = (other.Latitude - Latitude) * DEG_TO_RAD,
+			   dlon = (other.Longitude - Longitude) * DEG_TO_RAD;
 
-		double sinDLatOver2 = Math.Sin(dlat / 2),
-			   sinDLonOver2 = Math.Sin(dlon / 2);
+		float lat1 = Latitude * DEG_TO_RAD,
+			   lat2 = other.Latitude * DEG_TO_RAD;
 
-		double a = sinDLatOver2 * sinDLatOver2 +
-				   sinDLonOver2 * sinDLonOver2 * Math.Cos(lat1) * Math.Cos(lat2);
+		float sinDLatOver2 = fastSin(dlat / 2),
+			   sinDLonOver2 = fastSin(dlon / 2);
 
-		double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+		float a = sinDLatOver2 * sinDLatOver2 +
+				   sinDLonOver2 * sinDLonOver2 * fastCos(lat1) * fastCos(lat2);
 
-		return (float)(R * c);
+		float c = 2 * MathF.Atan2(MathF.Sqrt(a), MathF.Sqrt(1 - a));
+
+		return R * c;
 	}
 
 	public static Coordinate operator +(Coordinate left, Coordinate right) =>

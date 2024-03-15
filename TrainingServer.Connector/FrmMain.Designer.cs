@@ -28,17 +28,32 @@ partial class FrmMain
 	/// </summary>
 	private void InitializeComponent()
 	{
+		LbxServerList = new ListBox();
 		SuspendLayout();
+		// 
+		// LbxServerList
+		// 
+		LbxServerList.Dock = DockStyle.Fill;
+		LbxServerList.FormattingEnabled = true;
+		LbxServerList.ItemHeight = 15;
+		LbxServerList.Location = new Point(0, 0);
+		LbxServerList.Name = "LbxServerList";
+		LbxServerList.Size = new Size(800, 450);
+		LbxServerList.TabIndex = 1;
+		LbxServerList.SelectedIndexChanged += LbxServerList_SelectedIndexChanged;
 		// 
 		// FrmMain
 		// 
 		AutoScaleDimensions = new SizeF(7F, 15F);
 		AutoScaleMode = AutoScaleMode.Font;
 		ClientSize = new Size(800, 450);
+		Controls.Add(LbxServerList);
 		Name = "FrmMain";
-		Text = "IVAO Training Client";
+		Text = "Training System FSD Connector";
 		ResumeLayout(false);
 	}
 
 	#endregion
+
+	private ListBox LbxServerList;
 }

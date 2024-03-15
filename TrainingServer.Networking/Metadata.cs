@@ -1,10 +1,47 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using TrainingServer.Extensibility;
 
 namespace TrainingServer.Networking;
 
-public record struct ServerInfo(Guid Guid, string ReadableName) { }
+[JsonConverter(typeof(ServerInfoJsonConverter))]
+public record struct ServerInfo(Guid Guid, string ReadableName)
+{
+	public override readonly int GetHashCode() => Guid.GetHashCode();
+	public override readonly string ToString() => ReadableName;
+
+	public class ServerInfoJsonConverter : JsonConverter<ServerInfo>
+	{
+		public override ServerInfo Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+		{
+			if (reader.TokenType != JsonTokenType.StartObject || !reader.Read())
+				throw new JsonException();
+
+			if (reader.TokenType != JsonTokenType.PropertyName)
+				throw new JsonException();
+
+			Guid sGuid = Guid.Parse(reader.GetString() ?? throw new JsonException());
+
+			if (!reader.Read() || reader.TokenType != JsonTokenType.String)
+				throw new JsonException();
+
+			string sName = reader.GetString() ?? throw new JsonException();
+
+			if (!reader.Read() || reader.TokenType != JsonTokenType.EndObject)
+				throw new JsonException();
+
+			return new(sGuid, sName);
+		}
+
+		public override void Write(Utf8JsonWriter writer, ServerInfo value, JsonSerializerOptions options)
+		{
+			writer.WriteStartObject();
+			writer.WriteString(value.Guid.ToString(), value.ReadableName);
+			writer.WriteEndObject();
+		}
+	}
+}
 
 [JsonPolymorphic(UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FallBackToNearestAncestor)]
 [JsonDerivedType(typeof(AircraftUpdate), '%')]

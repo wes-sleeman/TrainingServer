@@ -37,7 +37,17 @@ internal class PluginManager
 	}
 
 	public Task TickAsync(TimeSpan delta) => Task.WhenAll(
-		_loadedPlugins.Where(kvp => kvp.Value).AsParallel().Select(kvp => kvp.Key.TickAsync(delta))
+		_loadedPlugins.Where(kvp => kvp.Value).AsParallel().Select(async kvp =>
+		{
+			try
+			{
+				await kvp.Key.TickAsync(delta);
+			}
+			catch (Exception ex)
+			{
+				System.Diagnostics.Debug.WriteLine($"Exception in plugin {kvp.Key}: {ex.Message}.\nStack Trace:\n{ex.StackTrace}");
+			}
+		})
 	);
 
 	public Task ProcessTextMessageAsync(string sender, string recipient, string message) => Task.WhenAll(
@@ -115,7 +125,20 @@ internal class PluginManager
 					if (pluginType.GetConstructors().OrderByDescending(c => c.GetParameters().Length).Where(c => c.GetParameters().All(pi => _injectionDict.ContainsKey(pi.ParameterType))).FirstOrDefault() is ConstructorInfo ci)
 					{
 						IPlugin plugin = Instantiate(ci);
-						_loadedPlugins[plugin] = false;
+
+						bool loadState = false;
+
+						if (_injectionDict.FirstOrDefault(kvp => kvp.Key.FullName == pluginType.FullName).Value is IPlugin oldPlugin)
+						{
+							if (oldPlugin is IAsyncDisposable iadOp)
+								await iadOp.DisposeAsync();
+							else if (oldPlugin is IDisposable idOp)
+								idOp.Dispose();
+
+							_loadedPlugins.TryRemove(oldPlugin, out loadState);
+						}
+
+						_loadedPlugins[plugin] = loadState;
 						_injectionDict[pluginType] = plugin;
 
 						pluginTypes.Remove(pluginType);

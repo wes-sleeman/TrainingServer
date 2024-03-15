@@ -64,6 +64,7 @@ partial class FrmMain
 		// 
 		// ClbPlugins
 		// 
+		ClbPlugins.CheckOnClick = true;
 		ClbPlugins.Dock = DockStyle.Fill;
 		ClbPlugins.Location = new Point(3, 3);
 		ClbPlugins.Name = "ClbPlugins";

@@ -1,7 +1,14 @@
 ﻿@page "/"
+@using TrainingServer.Hub.Data
+@inject ConnectionManager Manager
 
 <PageTitle>Index</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Connected servers</h1>
 
-Welcome to your new app.
+<ul>
+	@foreach (var server in Manager.ListServers())
+	{
+		<li>@server.ReadableName (@(server.Guid.ToString().Split('-')[0]))</li>
+	}
+</ul>

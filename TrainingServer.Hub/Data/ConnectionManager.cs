@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Net.WebSockets;
 using System.Text.Json.Nodes;
@@ -13,8 +14,9 @@ using TrainingServer.Networking;
 /// </summary>
 public class ConnectionManager
 {
-	private readonly ConcurrentDictionary<Guid, WebsocketMonitor> _monitors = new();
-	private readonly ConcurrentDictionary<Guid, ServerInfo> _servers = new();
+	private readonly ConcurrentDictionary<Guid, WebsocketMonitor> _monitors = [];
+	private readonly ConcurrentDictionary<Guid, ServerInfo> _servers = [];
+	private readonly ConcurrentDictionary<Guid, ImmutableHashSet<Guid>> _serverClients = [];
 	private readonly Transcoder _transcoder = new();
 
 	/// <summary>Accepts an incoming client websocket connection and establishes a secure tunnel.</summary>
@@ -35,12 +37,21 @@ public class ConnectionManager
 				Task blocker = monitor.MonitorAsync();
 				await SetupAsync(guid);
 
+				if (_serverClients.TryGetValue(server, out var otherClients))
+					_serverClients[server] = [..otherClients, guid];
+				else
+					_serverClients.TryAdd(server, [guid]);
+
 				monitor.OnTextMessageReceived += async msg =>
 				{
-					var (sent, recipient, data) = _transcoder.SecureUnpack(msg);
+					try
+					{
+						var (sent, recipient, data) = _transcoder.SecureUnpack(msg);
 
-					if (_monitors.TryGetValue(recipient, out var rSock))
-						await rSock.SendAsync(_transcoder.SecurePack(server, recipient, data));
+						if (_monitors.TryGetValue(recipient, out var rSock))
+							await rSock.SendAsync(_transcoder.SecurePack(server, recipient, data));
+					}
+					catch (Exception) { }
 				};
 
 				await blocker;
@@ -52,14 +63,17 @@ public class ConnectionManager
 				if (_monitors.TryRemove(guid, out var sock))
 					await sock.DisposeAsync(WebSocketCloseStatus.InvalidPayloadData, ex.Message);
 			}
+
+			if (_serverClients.TryGetValue(server, out var allClients))
+				_serverClients[server] = allClients.Remove(guid);
 		}
 
 		if (_monitors.TryRemove(guid, out var m))
 		{
 			if (_monitors.ContainsKey(server))
-				await m.DisposeAsync(WebSocketCloseStatus.EndpointUnavailable, "The requested server is not available.");
-			else
 				await m.DisposeAsync();
+			else
+				await m.DisposeAsync(WebSocketCloseStatus.EndpointUnavailable, "The requested server is not available.");
 		}
 	}
 
@@ -77,15 +91,20 @@ public class ConnectionManager
 			Task blocker = monitor.MonitorAsync();
 			await SetupAsync(guid);
 			_servers.TryAdd(guid, new(guid, _transcoder.SecureUnpack(await monitor.InterceptNextTextAsync()).Data.ToString()));
+			_serverClients.TryAdd(guid, []);
 
 			monitor.OnTextMessageReceived += async msg =>
 			{
-				var (sent, recipient, data) = _transcoder.SecureUnpack(msg);
+				try
+				{
+					var (sent, recipient, data) = _transcoder.SecureUnpack(msg);
 
-				if (recipient == guid)
-					await Task.WhenAll(_monitors.Where(kvp => kvp.Key != guid).AsParallel().Select(kvp => kvp.Value.SendAsync(_transcoder.SecurePack(guid, kvp.Key, data))));
-				else if (_monitors.TryGetValue(recipient, out var rSock))
-					await rSock.SendAsync(_transcoder.SecurePack(guid, recipient, data));
+					if (recipient == guid)
+						await Task.WhenAll(_monitors.Where(kvp => kvp.Key != guid).AsParallel().Select(kvp => kvp.Value.SendAsync(_transcoder.SecurePack(guid, kvp.Key, data))));
+					else if (_monitors.TryGetValue(recipient, out var rSock))
+						await rSock.SendAsync(_transcoder.SecurePack(guid, recipient, data));
+				}
+				catch (Exception) { }
 			};
 
 			await blocker;
@@ -103,6 +122,10 @@ public class ConnectionManager
 
 		if (_monitors.TryRemove(guid, out var m))
 			await m.DisposeAsync();
+
+		// Remove all connected clients.
+		if (_serverClients.TryGetValue(guid, out var allClients))
+			await Task.WhenAll(allClients.Where(_monitors.ContainsKey).Select(mg => _monitors[mg].DisposeAsync().AsTask()));
 	}
 
 	public IEnumerable<ServerInfo> ListServers() => _servers.Values;
@@ -122,7 +145,7 @@ public class ConnectionManager
 		// Send an encrypted handshake.
 		_ = _monitors[guid].SendAsync(_transcoder.SecurePack(guid, guid, Array.Empty<object>()));
 
-		if (_transcoder.SecureUnpack(await socket.InterceptNextTextAsync()).Data is not JsonArray ja || ja.Any())
+		if (_transcoder.SecureUnpack(await socket.InterceptNextTextAsync()).Data is not JsonArray ja || ja.Count != 0)
 		{
 			// Tunnel establishment handshake failed. Purge the client.
 			_transcoder.TryUnregister(guid);

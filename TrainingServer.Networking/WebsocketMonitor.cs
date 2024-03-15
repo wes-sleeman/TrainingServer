@@ -11,7 +11,7 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 	public event Action<string>? OnTextMessageReceived;
 	public event Action<byte[]>? OnBinaryMessageReceived;
 
-	public bool IsConnected => _connection.CloseStatus is not null && _connection.State is not WebSocketState.Closed;
+	public bool IsConnected { get; private set; } = false;
 
 	private Action<string>? InterceptSingleText;
 	private Action<byte[]>? InterceptSingleBinary;
@@ -22,10 +22,7 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 	/// <summary>
 	/// Wraps a <see cref="WebSocket"/>.
 	/// </summary>
-	public WebsocketMonitor(WebSocket socket)
-	{
-		_connection = socket;
-	}
+	public WebsocketMonitor(WebSocket socket) => _connection = socket;
 
 	/// <summary>
 	/// Wraps a <see cref="ClientWebSocket"/>.
@@ -34,6 +31,8 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 	{
 		if (socket.State != WebSocketState.Open)
 			throw new ArgumentException("Cannot use unopened websocket.", nameof(socket));
+
+		IsConnected = true;
 
 		_connection = (WebSocket)typeof(ClientWebSocket).GetProperty("ConnectedWebSocket", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(socket)!;
 	}
@@ -49,6 +48,7 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 
 		try
 		{
+			IsConnected = true;
 			while (!cancellationToken.IsCancellationRequested && !receiveResult.CloseStatus.HasValue)
 			{
 				if (receiveResult.MessageType == WebSocketMessageType.Text || !string.IsNullOrEmpty(messageText))
@@ -102,6 +102,7 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 			}
 		}
 		catch (WebSocketException) { /* Client died. */ }
+		catch (TaskCanceledException) { /* Client died. */ }
 
 		await DisposeAsync();
 	}
@@ -154,9 +155,13 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 	/// <param name="message">The reason for closure to be provided to the remote client.</param>
 	public async ValueTask DisposeAsync(WebSocketCloseStatus closeStatus, string message)
 	{
+		IsConnected = false;
 		_kill.Cancel(false);
-
-		if (_connection.CloseStatus is null && _connection.State is not WebSocketState.CloseSent and not WebSocketState.Closed and not WebSocketState.Aborted)
-			await _connection.CloseAsync(closeStatus, message, CancellationToken.None);
+		try
+		{
+			if (_connection.State is not WebSocketState.Aborted)
+				await _connection.CloseAsync(closeStatus, message, CancellationToken.None);
+		}
+		catch (WebSocketException) { }
 	}
 }

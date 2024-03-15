@@ -75,11 +75,13 @@ public class Transcoder
 		Aes? crypt = _symmetricProvider;
 
 		if (_symmetricKeys is not null && !_symmetricKeys.TryGetValue(recipient, out crypt))
-			throw new ArgumentException($"No tunnel set up with {recipient}.", nameof(recipient));
+			// Pick a random key.
+			// throw new ArgumentException($"No tunnel set up with {recipient}.", nameof(recipient));
+			crypt = _symmetricKeys.Values.First();
 
 		crypt.GenerateIV();
 
-		return [..crypt.IV, ..crypt.EncryptCbc(data, crypt.IV)];
+		return [.. crypt.IV, .. crypt.EncryptCbc(data, crypt.IV)];
 	}
 
 	/// <summary>Decrypts a text message received through an encrypted tunnel.</summary>
@@ -99,7 +101,9 @@ public class Transcoder
 		Aes? crypt = _symmetricProvider;
 
 		if (_symmetricKeys is not null && !_symmetricKeys.TryGetValue(sender, out crypt))
-			throw new ArgumentException($"No tunnel set up with {sender}.", nameof(sender));
+			// Pick a random key.
+			//throw new ArgumentException($"No tunnel set up with {sender}.", nameof(sender));
+			crypt = _symmetricKeys.Values.First();
 
 		return crypt.DecryptCbc(data[crypt.IV.Length..], data[..crypt.IV.Length]);
 	}

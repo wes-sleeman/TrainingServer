@@ -150,7 +150,29 @@ public partial class FrmMain : Form
 
 			server.OnControllerUpdated += Server_OnControllerUpdated;
 
-			await PollPluginsAsync();
+			await Task.WhenAll(
+				Task.Run(async () =>
+				{
+					DateTimeOffset lastAuthoritativeUpdate = DateTimeOffset.Now;
+					while (socket is not null && socket.IsConnected)
+					{
+						if (DateTimeOffset.Now - lastAuthoritativeUpdate < TimeSpan.FromMinutes(0.5))
+						{
+							await Task.Delay(1000);
+							continue;
+						}
+
+						await Task.WhenAll(
+							server.Controllers.Keys.Select(cGuid => socket.SendAsync(transcoder.SecurePack(guid, guid, new AuthoritativeUpdate(
+								cGuid,
+								[.. server.Controllers.Select(c => new ControllerUpdate(c.Key, c.Value))],
+								[.. server.Aircraft.Select(ac => new AircraftUpdate(ac.Key, ac.Value))]
+							))))
+						);
+					}
+				}),
+				PollPluginsAsync()
+			);
 		}
 		catch (WebSocketException) { }
 

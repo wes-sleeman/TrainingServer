@@ -2,14 +2,17 @@ using TrainingServer.Hub.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.AddJsonFile("wwwroot/appsettings.json");
+
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<ConnectionManager>();
-builder.Services.AddSingleton<OsmDataProvider>();
+builder.Services.AddSingleton<ManualDataProvider>();
 
 var app = builder.Build();
-app.Services.GetRequiredService<OsmDataProvider>();
+// Trigger any required loading.
+app.Services.GetRequiredService<ManualDataProvider>();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -26,6 +29,8 @@ app.UseWebSockets();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
+ManualDataProvider mdp = app.Services.GetRequiredService<ManualDataProvider>();
+
 app.Use(async (context, next) =>
 {
 	if (context.Request.Path.StartsWithSegments("/connect") && context.WebSockets.IsWebSocketRequest)
@@ -40,14 +45,28 @@ app.Use(async (context, next) =>
 			await manager.AcceptClientAsync(server, await context.WebSockets.AcceptWebSocketAsync(new WebSocketAcceptContext() { DangerousEnableCompression = true }));
 		}
 	}
+	else if (context.Request.Path.ToString().Equals("/geos", StringComparison.InvariantCultureIgnoreCase))
+		await context.Response.SendFileAsync(mdp.OsmGeoPath);
+	else if (context.Request.Path.ToString().Equals("/boundaries", StringComparison.InvariantCultureIgnoreCase))
+		await context.Response.SendFileAsync(mdp.BoundariesPath);
 	else
 		await next(context);
 });
 
-app.MapGet("/servers", (ConnectionManager manager) => manager.ListServers());
+static DateTime GetConfigFileWrittenDate(IConfiguration config, string configPath) =>
+	config[configPath] is string path
+	? (File.Exists(path)
+		? File.GetLastWriteTimeUtc(path)
+		: Directory.Exists(path)
+			? Directory.GetLastWriteTimeUtc(path)
+			: DateTime.MaxValue)
+	: DateTime.MaxValue;
 
-app.MapGet("/geos/nodes", (OsmDataProvider osm) => osm.Nodes.Values);
-app.MapGet("/geos/ways", (OsmDataProvider osm) => osm.Ways.Values);
-app.MapGet("/geos/relations", (OsmDataProvider osm) => osm.Relations.Values);
+app.MapGet("/cache/servers", () => DateTime.UtcNow);
+app.MapGet("/servers", (ConnectionManager manager) => manager.ListServers());
+app.MapGet("/cache/boundaries", (IConfiguration config) => GetConfigFileWrittenDate(config, "BoundariesFile"));
+app.MapGet("/topologies", (ManualDataProvider mdp) => mdp.Topologies);
+app.MapGet("/cache/topologies", (IConfiguration config) => GetConfigFileWrittenDate(config, "Topologies"));
+app.MapGet("/cache/geos", (IConfiguration config) => GetConfigFileWrittenDate(config, "OsmPbf"));
 
 app.Run();

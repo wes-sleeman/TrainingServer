@@ -15,7 +15,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TrainingServer.Hub", "Train
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugins", "Plugins", "{2C60B149-4272-4C05-8BE8-FBBBDC510C31}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpawnAircraft", "Plugins\SpawnAircraft\SpawnAircraft.csproj", "{2CC0E089-5DA9-4CA7-AB0E-2FBB85CCA42A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SpawnAircraft", "Plugins\SpawnAircraft\SpawnAircraft.csproj", "{2CC0E089-5DA9-4CA7-AB0E-2FBB85CCA42A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StressTest", "Plugins\StressTest\StressTest.csproj", "{F1B052F5-E469-42E0-B655-0E5512177BA8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSky", "Plugins\OpenSky\OpenSky.csproj", "{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -47,12 +51,22 @@ Global
 		{2CC0E089-5DA9-4CA7-AB0E-2FBB85CCA42A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2CC0E089-5DA9-4CA7-AB0E-2FBB85CCA42A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2CC0E089-5DA9-4CA7-AB0E-2FBB85CCA42A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F1B052F5-E469-42E0-B655-0E5512177BA8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F1B052F5-E469-42E0-B655-0E5512177BA8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F1B052F5-E469-42E0-B655-0E5512177BA8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F1B052F5-E469-42E0-B655-0E5512177BA8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{2CC0E089-5DA9-4CA7-AB0E-2FBB85CCA42A} = {2C60B149-4272-4C05-8BE8-FBBBDC510C31}
+		{F1B052F5-E469-42E0-B655-0E5512177BA8} = {2C60B149-4272-4C05-8BE8-FBBBDC510C31}
+		{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA} = {2C60B149-4272-4C05-8BE8-FBBBDC510C31}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {83BEFDE6-00DF-45E0-9A54-3FCFE1E004E9}
