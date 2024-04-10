@@ -1,14 +1,22 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ComputeSharp" Version="3.0.0-preview2" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TrainingServer.Extensibility\TrainingServer.Extensibility.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="ComputeSharp" />
   </ItemGroup>
 
 </Project>

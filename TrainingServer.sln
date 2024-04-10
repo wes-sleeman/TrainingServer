@@ -19,7 +19,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SpawnAircraft", "Plugins\Sp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StressTest", "Plugins\StressTest\StressTest.csproj", "{F1B052F5-E469-42E0-B655-0E5512177BA8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSky", "Plugins\OpenSky\OpenSky.csproj", "{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSky", "Plugins\OpenSky\OpenSky.csproj", "{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TrainingServer.Extensibility.Parallel", "TrainingServer.Extensibility.Parallel\TrainingServer.Extensibility.Parallel.csproj", "{7BDBA810-3506-4741-A70F-30EA622AEE47}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -59,6 +61,10 @@ Global
 		{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7BDBA810-3506-4741-A70F-30EA622AEE47}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7BDBA810-3506-4741-A70F-30EA622AEE47}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7BDBA810-3506-4741-A70F-30EA622AEE47}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7BDBA810-3506-4741-A70F-30EA622AEE47}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

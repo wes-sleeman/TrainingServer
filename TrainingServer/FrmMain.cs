@@ -1,5 +1,4 @@
 using System.Net.WebSockets;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -11,6 +10,8 @@ namespace TrainingServer;
 
 public partial class FrmMain : Form
 {
+	public const string HUB_ADDRESS = @"hub.wsleeman.com:5031";
+
 	public FrmMain()
 	{
 		InitializeComponent();
@@ -23,7 +24,6 @@ public partial class FrmMain : Form
 	}
 
 	WebsocketMonitor? socket;
-	Transcoder? transcoder;
 	readonly PluginManager manager;
 	readonly Server server;
 	Guid guid;
@@ -47,43 +47,22 @@ public partial class FrmMain : Form
 
 	private async Task ServerConnectedAsync()
 	{
-		transcoder = new();
 		ClientWebSocket sockClient = new();
 
 		try
 		{
 			// Connect to the server.
-			await sockClient.ConnectAsync(new("ws://127.0.0.1:5031/connect"), CancellationToken.None);
+			await sockClient.ConnectAsync(new($"ws://{HUB_ADDRESS}/connect"), CancellationToken.None);
 			socket = new(sockClient);
 			_ = socket.MonitorAsync();
 
 			// Get your GUID.
-			string[] rsaParamElems = (await socket.InterceptNextTextAsync()).Split('|');
-			if (rsaParamElems.Length != 3)
-				return;
-
-			guid = Guid.Parse(rsaParamElems[0]);
+			string guidStr = await socket.InterceptNextTextAsync();
+			guid = Guid.Parse(guidStr);
 			Invoke(() => Text = $"Training Server (Connected: {guid})");
-			transcoder.LoadAsymmetricKey(new() { Modulus = Convert.FromBase64String(rsaParamElems[1]), Exponent = Convert.FromBase64String(rsaParamElems[2]) });
-
-			// Setup the encrypted tunnel.
-			byte[] symKey = Aes.Create().Key;
-			transcoder.RegisterKey(guid, symKey);
-
-			byte[] symKeyCrypt = transcoder.AsymmetricEncrypt(symKey);
-			await Task.Delay(100);
-			await socket.SendAsync(symKeyCrypt);
-
-			if (transcoder.SecureUnpack(await socket.InterceptNextTextAsync()).Data is not JsonArray ja || ja.Count != 0)
-				// Tunnel establishment handshake failed. Purge the server.
-				await socket.DisposeAsync(WebSocketCloseStatus.ProtocolError, "Handshake failed.");
-
-			await Task.Delay(100);
-			await socket.SendAsync(transcoder.SecurePack(guid, guid, Array.Empty<object>()));
 
 			// Send your server name.
-			await Task.Delay(100);
-			await socket.SendAsync(transcoder.SecurePack(guid, guid, $"{Environment.UserName}'s Server"));
+			await socket.SendAsync($"{guid}|{Environment.UserName}'s Server");
 
 			// Update the UI.
 			BtnStart.Invoke(() =>
@@ -94,10 +73,15 @@ public partial class FrmMain : Form
 
 			socket.OnTextMessageReceived += async (msg) =>
 			{
-				var (date, recipient, text) = transcoder.SecureUnpack(msg);
-
-				if (text.Deserialize<NetworkMessage>(JsonSerializerOptions.Default) is NetworkMessage netmsg)
-					await server.MessageReceivedAsync(netmsg);
+				try
+				{
+					if (JsonNode.Parse(msg).Deserialize<NetworkMessage>(JsonSerializerOptions.Default) is NetworkMessage netmsg)
+						await server.MessageReceivedAsync(netmsg);
+				}
+				catch (Exception ex)
+				{
+					System.Diagnostics.Debug.WriteLine($"Error handling message!{Environment.NewLine}Message: {msg}{Environment.NewLine}Error: {ex}.");
+				}
 			};
 
 			server.OnTextMessageReceived += async txt =>
@@ -133,19 +117,25 @@ public partial class FrmMain : Form
 				await manager.ProcessTextMessageAsync(sender, recipient, txt.Message);
 			};
 
-			server.OnAircraftAdded += g => transcoder.RegisterSecondaryRecipient(g, guid);
+			server.OnAircraftAdded += async g =>
+			{
+				await socket.SendAsync(new AuthoritativeUpdate(
+					g,
+					server.Controllers.Select(kvp => new ControllerUpdate(kvp.Key, kvp.Value)).ToArray(),
+					server.Aircraft.Select(kvp => new AircraftUpdate(kvp.Key, kvp.Value)).ToArray()
+				));
+			};
 
 			server.OnAircraftUpdated += Server_OnAircraftUpdated;
 
 			// Register new controllers and send authoritative updates.
 			server.OnControllerAdded += async g =>
 			{
-				transcoder.RegisterSecondaryRecipient(g, guid);
-				await socket.SendAsync(transcoder.SecurePack(guid, g, new AuthoritativeUpdate(
+				await socket.SendAsync(new AuthoritativeUpdate(
 					g,
 					server.Controllers.Select(kvp => new ControllerUpdate(kvp.Key, kvp.Value)).ToArray(),
 					server.Aircraft.Select(kvp => new AircraftUpdate(kvp.Key, kvp.Value)).ToArray()
-				)));
+				));
 			};
 
 			server.OnControllerUpdated += Server_OnControllerUpdated;
@@ -163,11 +153,11 @@ public partial class FrmMain : Form
 						}
 
 						await Task.WhenAll(
-							server.Controllers.Keys.Select(cGuid => socket.SendAsync(transcoder.SecurePack(guid, guid, new AuthoritativeUpdate(
+							server.Controllers.Keys.Select(cGuid => socket.SendAsync(new AuthoritativeUpdate(
 								cGuid,
 								[.. server.Controllers.Select(c => new ControllerUpdate(c.Key, c.Value))],
 								[.. server.Aircraft.Select(ac => new AircraftUpdate(ac.Key, ac.Value))]
-							))))
+							)))
 						);
 					}
 				}),
@@ -181,19 +171,19 @@ public partial class FrmMain : Form
 
 	private async void Server_OnControllerUpdated(ControllerUpdate delta)
 	{
-		if (socket is null || transcoder is null)
+		if (socket is null)
 			return;
 
-		await socket.SendAsync(transcoder.SecurePack(guid, guid, delta));
+		await socket.SendAsync(delta);
 	}
 
 	private async void Server_OnAircraftUpdated(AircraftUpdate[] delta)
 	{
-		if (socket is null || transcoder is null)
+		if (socket is null)
 			return;
 
 		foreach (var update in delta)
-			await socket.SendAsync(transcoder.SecurePack(guid, guid, update));
+			await socket.SendAsync(update);
 	}
 
 	private async Task PollPluginsAsync()

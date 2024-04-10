@@ -79,7 +79,7 @@ public class OpenSkyAircraft(IEnumerable<Aircraft> aircraft)
 				}
 
 				if (!reader.Read() ||
-					!reader.TryGetSingle(out float geoAltitudeMetres) || !reader.Read())
+					!(reader.TokenType == JsonTokenType.Null || reader.TryGetSingle(out float geoAltitudeMetres)) || !reader.Read())
 					throw new JsonException();
 
 				if (!ushort.TryParse(reader.GetString(), out ushort squawk))

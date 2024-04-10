@@ -42,7 +42,7 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 	{
 		CancellationToken cancellationToken = _kill.Token;
 		var buffer = new byte[1024 * 4];
-		string messageText = "";
+		StringBuilder messageText = new();
 		List<byte> messageBuffer = [];
 		var receiveResult = await _connection.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
 
@@ -51,27 +51,27 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 			IsConnected = true;
 			while (!cancellationToken.IsCancellationRequested && !receiveResult.CloseStatus.HasValue)
 			{
-				if (receiveResult.MessageType == WebSocketMessageType.Text || !string.IsNullOrEmpty(messageText))
+				if (receiveResult.MessageType == WebSocketMessageType.Text || messageText.Length != 0)
 				{
-					messageText += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+					messageText.Append(Encoding.UTF8.GetString(buffer).TrimEnd('\0'));
 
 					if (receiveResult.EndOfMessage)
 					{
 						if (InterceptSingleText is not null)
-							InterceptSingleText.Invoke(messageText);
+							InterceptSingleText.Invoke(messageText.ToString());
 						else if (OnTextMessageReceived is not null)
-							OnTextMessageReceived.Invoke(messageText);
+							OnTextMessageReceived.Invoke(messageText.ToString());
 						else
 						{
 							while (InterceptSingleText is null)
 								Thread.Yield();
 
-							InterceptSingleText.Invoke(messageText);
+							InterceptSingleText.Invoke(messageText.ToString());
 						}
 
 						InterceptSingleText = null;
 
-						messageText = "";
+						messageText.Clear();
 					}
 				}
 				else
@@ -106,6 +106,12 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 
 		await DisposeAsync();
 	}
+
+	/// <summary>
+	/// Sends a <see cref="NetworkMessage"/> to the connected client.
+	/// </summary>
+	/// <param name="data">The message to send.</param>
+	public Task SendAsync(NetworkMessage data) => SendAsync(System.Text.Json.JsonSerializer.Serialize(data));
 
 	/// <summary>
 	/// Sends a text message to the connected client.

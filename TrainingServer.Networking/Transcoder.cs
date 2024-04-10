@@ -9,6 +9,7 @@ using static System.Text.Encoding;
 /// <summary>
 /// Provides symmetric and asymmetric encryption capabilities for managing secure communications with multiple recipients.
 /// </summary>
+[Obsolete("This is likely going to be useful in the future, but for now it's just in the way.")]
 public class Transcoder
 {
 	readonly RSA _asymmetricProvider = RSA.Create();

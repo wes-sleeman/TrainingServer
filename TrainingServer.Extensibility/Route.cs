@@ -5,8 +5,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
+[assembly: InternalsVisibleTo("TrainingServer.Extensibility.Parallel")]
 
 namespace TrainingServer.Extensibility;
 
@@ -131,26 +134,30 @@ public class Route : IEnumerable<Route.RouteSegment>
 		else if (_segments.Count == 1)
 			return new(Name, segments: []);
 
-		List<RouteSegment> segments = [_segments[0]];
-		bool[] filterList = [.._segments.Select(s => filter(s.Point))];
+		return FilterInternal(this, [.. _segments.Select(s => filter(s.Point))]);
+	}
+
+	internal static Route FilterInternal(Route route, bool[] filterList)
+	{
+		List<RouteSegment> segments = [route._segments[0]];
 
 		for (int cntr = 0; cntr < filterList.Length; ++cntr)
 			if (filterList[cntr] || (cntr > 0 && filterList[cntr - 1]) || (cntr < filterList.Length - 1 && filterList[cntr + 1]))
 			{
 				if (segments.Count == 0)
-					segments.Add(new StraightLineSegment(_segments[cntr].Point, _segments[cntr].PointLabel));
+					segments.Add(new StraightLineSegment(route._segments[cntr].Point, route._segments[cntr].PointLabel));
 				else if (cntr > 0 && filterList[cntr - 1])
-					segments.Add(_segments[cntr]);
+					segments.Add(route._segments[cntr]);
 				else
 				{
 					if (segments[^1] is InvisibleSegment || segments.Count == 1)
-						segments[^1] = new InvisibleSegment(_segments[cntr].Point);
+						segments[^1] = new InvisibleSegment(route._segments[cntr].Point);
 					else
-						segments.Add(new InvisibleSegment(_segments[cntr].Point));
+						segments.Add(new InvisibleSegment(route._segments[cntr].Point));
 				}
 			}
-		
-		return new(Name, [..segments]);
+
+		return new(route.Name, [.. segments]);
 	}
 
 	public string ToSpaceSeparated() => string.Join(" ", _segments.Select(p => $"{p.Point.Latitude:00.00000} {p.Point.Longitude:00.00000}"));
@@ -179,6 +186,12 @@ public class Route : IEnumerable<Route.RouteSegment>
 	public IEnumerator<RouteSegment> GetEnumerator() => ((IEnumerable<RouteSegment>)_segments).GetEnumerator();
 	System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => ((System.Collections.IEnumerable)_segments).GetEnumerator();
 
+	public RouteSegment this[int idx]
+	{
+		get => _segments[idx];
+		set => _segments[idx] = value;
+	}
+
 	public override string ToString() => Name;
 
 	[JsonPolymorphic(TypeDiscriminatorPropertyName = "$", UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FallBackToNearestAncestor)]
@@ -200,7 +213,7 @@ public class Route : IEnumerable<Route.RouteSegment>
 		private record JsonRoute(string Name, RouteSegment[] Segments)
 		{
 			public static implicit operator Route?([NotNullIfNotNull(nameof(me))] JsonRoute? me) => me is null ? null : new(me.Name, me.Segments);
-			public static implicit operator JsonRoute(Route them) => new(them.Name, [..them._segments]);
+			public static implicit operator JsonRoute(Route them) => new(them.Name, [.. them._segments]);
 		}
 
 		public override Route? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>

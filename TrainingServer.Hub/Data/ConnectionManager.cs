@@ -17,7 +17,6 @@ public class ConnectionManager
 	private readonly ConcurrentDictionary<Guid, WebsocketMonitor> _monitors = [];
 	private readonly ConcurrentDictionary<Guid, ServerInfo> _servers = [];
 	private readonly ConcurrentDictionary<Guid, ImmutableHashSet<Guid>> _serverClients = [];
-	private readonly Transcoder _transcoder = new();
 
 	/// <summary>Accepts an incoming client websocket connection and establishes a secure tunnel.</summary>
 	/// <param name="serverId">The server that the websocket was established against.</param>
@@ -38,7 +37,7 @@ public class ConnectionManager
 				await SetupAsync(guid);
 
 				if (_serverClients.TryGetValue(server, out var otherClients))
-					_serverClients[server] = [..otherClients, guid];
+					_serverClients[server] = [.. otherClients, guid];
 				else
 					_serverClients.TryAdd(server, [guid]);
 
@@ -46,10 +45,8 @@ public class ConnectionManager
 				{
 					try
 					{
-						var (sent, recipient, data) = _transcoder.SecureUnpack(msg);
-
-						if (_monitors.TryGetValue(recipient, out var rSock))
-							await rSock.SendAsync(_transcoder.SecurePack(server, recipient, data));
+						if (_monitors.TryGetValue(server, out var rSock))
+							await rSock.SendAsync(msg);
 					}
 					catch (Exception) { }
 				};
@@ -59,9 +56,12 @@ public class ConnectionManager
 			catch (ArgumentException ex)
 			{
 				// Remote client is non-compliant. Purge it.
-				_transcoder.TryUnregister(guid);
 				if (_monitors.TryRemove(guid, out var sock))
 					await sock.DisposeAsync(WebSocketCloseStatus.InvalidPayloadData, ex.Message);
+			}
+			catch (OperationCanceledException)
+			{
+				// Server was killed by the remote. Bye bye!
 			}
 
 			if (_serverClients.TryGetValue(server, out var allClients))
@@ -89,30 +89,34 @@ public class ConnectionManager
 		{
 			// Perform the handshake to setup encryption.
 			Task blocker = monitor.MonitorAsync();
-			await SetupAsync(guid);
-			_servers.TryAdd(guid, new(guid, _transcoder.SecureUnpack(await monitor.InterceptNextTextAsync()).Data.ToString()));
-			_serverClients.TryAdd(guid, []);
 
-			monitor.OnTextMessageReceived += async msg =>
+			if (await SetupAsync(guid) is string serverName)
 			{
-				try
+
+				_servers.TryAdd(guid, new(guid, serverName));
+				_serverClients.TryAdd(guid, []);
+
+				monitor.OnTextMessageReceived += async msg =>
 				{
-					var (sent, recipient, data) = _transcoder.SecureUnpack(msg);
+					try
+					{
+						if (_serverClients.TryGetValue(guid, out var clients))
+							foreach (var client in clients)
+								if (_monitors.TryGetValue(client, out var rSock))
+									await rSock.SendAsync(msg);
+					}
+					catch (Exception) { }
+				};
 
-					if (recipient == guid)
-						await Task.WhenAll(_monitors.Where(kvp => kvp.Key != guid).AsParallel().Select(kvp => kvp.Value.SendAsync(_transcoder.SecurePack(guid, kvp.Key, data))));
-					else if (_monitors.TryGetValue(recipient, out var rSock))
-						await rSock.SendAsync(_transcoder.SecurePack(guid, recipient, data));
-				}
-				catch (Exception) { }
-			};
-
-			await blocker;
+				await blocker;
+			}
+			else if (_monitors.TryRemove(guid, out var sock))
+				// Remote client is non-compliant. Purge it
+				await sock.DisposeAsync(WebSocketCloseStatus.ProtocolError, "Invalid handshake.");
 		}
 		catch (ArgumentException ex)
 		{
 			// Remote client is non-compliant. Purge it.
-			_transcoder.TryUnregister(guid);
 			if (_monitors.TryRemove(guid, out var sock))
 				await sock.DisposeAsync(WebSocketCloseStatus.ProtocolError, ex.Message);
 		}
@@ -130,27 +134,25 @@ public class ConnectionManager
 
 	public IEnumerable<ServerInfo> ListServers() => _servers.Values;
 
-	private async Task SetupAsync(Guid guid)
+	/// <returns>The name of the endpoint.</returns>
+	private async Task<string?> SetupAsync(Guid guid)
 	{
 		// Establish a tunnel.
 		var socket = _monitors[guid];
-		var key = _transcoder.GetAsymmetricKey();
 		await Task.Delay(100);
-		_ = socket.SendAsync(guid.ToString() + '|' + Convert.ToBase64String(key.Modulus!) + '|' + Convert.ToBase64String(key.Exponent!));
+		_ = socket.SendAsync(guid.ToString());
 
-		byte[] symKeyCrypt = (await socket.InterceptNextBinaryAsync())[..256];
-		_transcoder.RegisterKey(guid, _transcoder.AsymmetricDecrypt(symKeyCrypt));
+		string handshake = await socket.InterceptNextTextAsync();
 
-		await Task.Delay(100);
-		// Send an encrypted handshake.
-		_ = _monitors[guid].SendAsync(_transcoder.SecurePack(guid, guid, Array.Empty<object>()));
-
-		if (_transcoder.SecureUnpack(await socket.InterceptNextTextAsync()).Data is not JsonArray ja || ja.Count != 0)
+		if (!handshake.StartsWith($"{guid}|"))
 		{
 			// Tunnel establishment handshake failed. Purge the client.
-			_transcoder.TryUnregister(guid);
 			if (_monitors.TryRemove(guid, out var sock))
 				await sock.DisposeAsync(WebSocketCloseStatus.ProtocolError, "Handshake failed.");
+
+			return null;
 		}
+
+		return handshake[(handshake.IndexOf('|') + 1)..];
 	}
 }
