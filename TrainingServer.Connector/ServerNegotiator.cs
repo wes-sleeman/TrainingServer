@@ -56,10 +56,23 @@ internal class ServerNegotiator(CancellationToken token)
 
 			void unpackMessage(string rawJson)
 			{
-				if (JsonNode.Parse(rawJson).Deserialize<NetworkMessage>() is not NetworkMessage msg)
-					return;
+				try
+				{
+					if (JsonNode.Parse(rawJson).Deserialize<NetworkMessage>() is not NetworkMessage msg)
+						return;
 
-				PacketReceived?.Invoke(DateTimeOffset.Now, msg);
+					PacketReceived?.Invoke(DateTimeOffset.Now, msg);
+				}
+				catch (JsonException) when (rawJson.IndexOf('}') < 0) { return; }
+				catch (JsonException)
+				{
+					rawJson = rawJson.TrimEnd()[..^1];
+
+					while (rawJson.Count(c => c == '{') != rawJson.Count(c => c == '}'))
+						rawJson = rawJson[..(rawJson[..^1].LastIndexOf('}') + 1)];
+
+					unpackMessage(rawJson); 
+				}
 			}
 
 			socket.OnTextMessageReceived += unpackMessage;

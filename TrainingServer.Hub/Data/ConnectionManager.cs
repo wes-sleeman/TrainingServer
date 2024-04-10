@@ -92,7 +92,6 @@ public class ConnectionManager
 
 			if (await SetupAsync(guid) is string serverName)
 			{
-
 				_servers.TryAdd(guid, new(guid, serverName));
 				_serverClients.TryAdd(guid, []);
 

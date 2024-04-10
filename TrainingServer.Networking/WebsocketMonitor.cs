@@ -41,7 +41,7 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 	public async Task MonitorAsync()
 	{
 		CancellationToken cancellationToken = _kill.Token;
-		var buffer = new byte[1024 * 4];
+		var buffer = new byte[1024 * 8];
 		StringBuilder messageText = new();
 		List<byte> messageBuffer = [];
 		var receiveResult = await _connection.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
@@ -72,6 +72,7 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 						InterceptSingleText = null;
 
 						messageText.Clear();
+						GC.Collect();
 					}
 				}
 				else
@@ -95,6 +96,7 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 						InterceptSingleBinary = null;
 
 						messageBuffer.Clear();
+						GC.Collect();
 					}
 				}
 

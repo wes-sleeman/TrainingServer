@@ -18,6 +18,8 @@ public class OpenSky(IServer _server) : IPlugin
 
 	TimeSpan _timeSinceLastUpdate = TimeSpan.FromDays(1);
 
+	const float BOUNDING_BOX_SIZE = 1.0f;
+
 	public async Task TickAsync(TimeSpan delta)
 	{
 		_timeSinceLastUpdate += delta;
@@ -28,7 +30,7 @@ public class OpenSky(IServer _server) : IPlugin
 		_timeSinceLastUpdate = TimeSpan.Zero;
 
 		static (float minLat, float maxLat, float minLon, float maxLon) getBox(Coordinate c) =>
-			(c.Latitude - 1.5f, c.Latitude + 1.5f, c.Longitude - 1.5f, c.Longitude + 1.5f);
+			(c.Latitude - BOUNDING_BOX_SIZE, c.Latitude + BOUNDING_BOX_SIZE, c.Longitude - BOUNDING_BOX_SIZE, c.Longitude + BOUNDING_BOX_SIZE);
 
 		Coordinate[] cps = [.. _server.Controllers.Values.SelectMany(c => c.Position.RadarAntennae is null ? [] : c.Position.RadarAntennae)];
 

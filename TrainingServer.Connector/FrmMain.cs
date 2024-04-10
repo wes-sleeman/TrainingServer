@@ -181,6 +181,18 @@ public partial class FrmMain : Form
 				}
 				break;
 
+			case "!":
+				switch (packetSegments[1][0])
+				{
+					case 'C':
+						// Sign in.
+						_client.Send($"!RSERVER:{packetSegments[1][1..]}:B:0:12:12:127.0.0.1");
+						break;
+
+					default: throw new NotImplementedException();
+				}
+				break;
+
 			default:
 				throw new NotImplementedException();
 		}

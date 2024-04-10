@@ -78,15 +78,22 @@ internal class FsdNegotiator
 			NewLine = "\r\n"
 		};
 
+		SemaphoreSlim writeLock = new(1);
+
 		Distribute += async (string message) =>
 		{
 			try
 			{
+				await writeLock.WaitAsync();
 				await writer.WriteLineAsync(message);
 			}
 			catch (IOException)
 			{
 				// Client disconnected.
+			}
+			finally
+			{
+				writeLock.Release();
 			}
 		};
 
