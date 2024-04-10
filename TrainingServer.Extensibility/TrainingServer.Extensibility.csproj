@@ -19,10 +19,6 @@
 		<NoWarn>1701;1702;NU1701</NoWarn>
 	</PropertyGroup>
 
-	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<Exec Command="copy $(OutDir)$(AssemblyName).dll $(ProjectDir)" />
-	</Target>
-
 	<ItemGroup>
 		<PackageReference Include="Simplify.NET" Version="1.0.2" />
 	</ItemGroup>

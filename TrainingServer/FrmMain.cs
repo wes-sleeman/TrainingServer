@@ -10,7 +10,7 @@ namespace TrainingServer;
 
 public partial class FrmMain : Form
 {
-	public const string HUB_ADDRESS = @"hub.wsleeman.com:5031";
+	public const string HUB_ADDRESS = @"hub.wsleeman.com";
 
 	public FrmMain()
 	{
