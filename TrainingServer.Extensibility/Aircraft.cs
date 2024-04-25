@@ -32,7 +32,7 @@ public record struct AircraftMotion(uint Speed, int ClimbRate, float TurnRate)
 	{
 		if (TurnRate == 0)
 			return source with {
-				Heading = (float)duration.TotalSeconds * TurnRate + source.Heading,
+				Heading = source.Heading,
 				Altitude = source.Altitude + (int)(ClimbRate * duration.TotalSeconds),
 				Position = source.Position.FixRadialDistance(source.Heading, (float)duration.TotalHours * Speed) 
 			};

@@ -63,15 +63,34 @@ internal class ServerNegotiator(CancellationToken token)
 
 					PacketReceived?.Invoke(DateTimeOffset.Now, msg);
 				}
-				catch (JsonException) when (rawJson.IndexOf('}') < 0) { return; }
+				catch (JsonException) when (rawJson.Length <= 0) { return; }
 				catch (JsonException)
 				{
 					rawJson = rawJson.TrimEnd()[..^1];
 
-					while (rawJson.Count(c => c == '{') != rawJson.Count(c => c == '}'))
-						rawJson = rawJson[..(rawJson[..^1].LastIndexOf('}') + 1)];
+					int quotes, braceCount;
 
-					unpackMessage(rawJson); 
+					do
+					{
+						int lastBrace = rawJson[..^1].LastIndexOf('}');
+
+						if (lastBrace == -1)
+							return;
+
+						rawJson = rawJson[..(lastBrace + 1)];
+
+						quotes = 0; braceCount = 0;
+
+						foreach (char c in rawJson)
+							if (c == '"')
+								++quotes;
+							else if (c == '{')
+								++braceCount;
+							else if (c == '}')
+								--braceCount;
+					} while (quotes % 2 != 0 || braceCount != 0);
+
+					unpackMessage(rawJson);
 				}
 			}
 

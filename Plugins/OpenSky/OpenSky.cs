@@ -18,7 +18,7 @@ public class OpenSky(IServer _server) : IPlugin
 
 	TimeSpan _timeSinceLastUpdate = TimeSpan.FromDays(1);
 
-	const float BOUNDING_BOX_SIZE = 1.0f;
+	const float BOUNDING_BOX_SIZE = .5f;
 
 	public async Task TickAsync(TimeSpan delta)
 	{

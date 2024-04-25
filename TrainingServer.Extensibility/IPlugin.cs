@@ -27,3 +27,6 @@ public interface IPlugin
 	/// <param name="delta">The time elapsed since the last call.</param>
 	public Task TickAsync(TimeSpan delta);
 }
+
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public class HiddenAttribute : Attribute { }

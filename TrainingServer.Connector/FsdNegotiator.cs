@@ -127,10 +127,10 @@ internal class FsdNegotiator
 	HashSet<Aircraft> prevAircraft = [];
 	HashSet<Controller> prevControllers = [];
 	DateTimeOffset lastPoke = DateTimeOffset.MinValue;
-	Task PokeClientAsync()
+	async Task PokeClientAsync()
 	{
 		if (lastPoke > DateTimeOffset.Now - TimeSpan.FromSeconds(1.5))
-			return Task.CompletedTask;
+			return;
 
 		lastPoke = DateTimeOffset.Now;
 
@@ -149,12 +149,17 @@ internal class FsdNegotiator
 		prevAircraft = [.. Aircraft.Values];
 		prevControllers = [.. Controllers.Values];
 
-		Task? UpdateAc(Aircraft ac) =>
-			Distribute?.Invoke($"@{ac.Position.Squawk.Mode switch { Squawk.SquawkMode.Altitude => "N", _ => "S"  }}:{ac.Metadata.Callsign}:{ac.Position.Squawk.Code}:6:{ac.Position.Position.Latitude}:{ac.Position.Position.Longitude}:{ac.Position.Altitude}:{ac.Movement.Speed}:{TupleToPBH((0, 0, ac.Position.Heading, false))}:0");
+		var extrapolationOffset = DateTimeOffset.Now - TimeSpan.FromSeconds(1);
 
-		return Task.WhenAll(
-			Aircraft.Values.Select(ac => ac.Extrapolate(DateTimeOffset.Now - TimeSpan.FromSeconds(1))).Select(UpdateAc).Where(t => t is not null).Cast<Task>()
-		);
+		string[] updates =
+			Aircraft.Values
+			.Select(ac => ac.Extrapolate(extrapolationOffset))
+			.Select(ac => $"@{ac.Position.Squawk.Mode switch { Squawk.SquawkMode.Altitude => "N", _ => "S" }}:{ac.Metadata.Callsign}:{ac.Position.Squawk.Code}:6:{ac.Position.Position.Latitude}:{ac.Position.Position.Longitude}:{ac.Position.Altitude}:{ac.Movement.Speed}:{TupleToPBH((0, 0, ac.Position.Heading, false))}:0")
+			.ToArray();
+
+		if (Distribute is not null)
+			foreach (string pos in updates)
+				await Distribute.Invoke(pos);
 	}
 
 	public static uint TupleToPBH((float Pitch, float Bank, float Heading, bool OnGround) PBH)

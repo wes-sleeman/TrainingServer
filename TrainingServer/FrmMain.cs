@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -217,7 +218,7 @@ public partial class FrmMain : Form
 		ClbPlugins.BeginUpdate();
 		ClbPlugins.Items.Clear();
 
-		foreach (var kvp in manager._loadedPlugins)
+		foreach (var kvp in manager._loadedPlugins.Where(kvp => kvp.Key.GetType().GetTypeInfo().GetCustomAttributes().All(a => a is not HiddenAttribute)))
 			ClbPlugins.Items.Add(kvp.Key, kvp.Value);
 
 		ClbPlugins.EndUpdate();
