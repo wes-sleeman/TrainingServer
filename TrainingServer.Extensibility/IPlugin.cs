@@ -29,4 +29,7 @@ public interface IPlugin
 }
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public class HiddenAttribute : Attribute { }
+public class HiddenAttribute() : Attribute { }
+
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public class EnabledAttribute() : Attribute { }

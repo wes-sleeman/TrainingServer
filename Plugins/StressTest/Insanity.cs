@@ -14,12 +14,12 @@ public partial class Insanity(IServer server) : IPlugin
 
 	bool stressed = false;
 
-	public async Task ProcessTextMessageAsync(string sender, string recipient, string message)
+	public Task ProcessTextMessageAsync(string sender, string recipient, string message)
 	{
 		message = message.Trim().ToUpperInvariant();
 
 		if (!message.StartsWith("STRESS"))
-			return;
+			return Task.CompletedTask;
 
 		if (stressed)
 		{
@@ -31,7 +31,7 @@ public partial class Insanity(IServer server) : IPlugin
 			var bounds = CoordinateRegex().Matches(message).Where(m => m.Success).Select(m => new Coordinate(float.Parse(m.Groups["lat"].Value), float.Parse(m.Groups["lon"].Value))).ToArray();
 
 			if (bounds.Length == 0)
-				return;
+				return Task.CompletedTask;
 
 			stressed = true;
 
@@ -48,6 +48,8 @@ public partial class Insanity(IServer server) : IPlugin
 				for (float lon = left; lon <= right; lon += 0.5f)
 					server.AddAircraft(newFromCoord(new(lat, lon)));
 		}
+
+		return Task.CompletedTask;
 	}
 
 	public Task TickAsync(TimeSpan delta) => Task.CompletedTask;

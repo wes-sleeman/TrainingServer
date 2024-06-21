@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Text.Json.Serialization;
 
 namespace TrainingServer.Extensibility;
@@ -6,6 +7,9 @@ namespace TrainingServer.Extensibility;
 public record Controller(DateTimeOffset Time, ControllerData Metadata, ControllerSnapshot Position)
 {
 	public Controller(ControllerData metadata, ControllerSnapshot position) : this(DateTimeOffset.Now, metadata, position) { }
+
+	public virtual bool Equals(Controller? other) => other is Controller o && GetHashCode() == o.GetHashCode();
+	public override int GetHashCode() => HashCode.Combine(Metadata.Callsign, Position.RadarAntennae?.Aggregate(0, (s, i) => HashCode.Combine(s, i.Latitude, i.Longitude)) ?? 0);
 }
 
 public record struct ControllerSnapshot(Coordinate[] RadarAntennae) { }

@@ -84,17 +84,27 @@ internal class PluginManager
 
 			// Reflect the DLLs into something we can use.
 			HashSet<Type> pluginTypes = [];
+			HashSet<Assembly> loadedAssemblies = [];
 
 			foreach (string path in locatedDlls)
 			{
 				try
 				{
 					Assembly asm = Assembly.LoadFile(path);
+					loadedAssemblies.Add(asm);
 
 					pluginTypes.UnionWith(asm.GetExportedTypes().Where(et => et.GetInterfaces().Contains(typeof(IPlugin))));
 				}
 				catch (Exception) { /* Oh so many things can go wrong here! */ }
 			}
+
+			AppDomain.CurrentDomain.AssemblyResolve += (object? _, ResolveEventArgs e) => {
+				foreach (Assembly asm in loadedAssemblies)
+					if (asm.FullName == e.Name)
+						return asm;
+
+				return null;
+			};
 
 			pluginTypes = pluginTypes.DistinctBy(t => t.AssemblyQualifiedName).ToHashSet();
 
@@ -112,7 +122,7 @@ internal class PluginManager
 					paramList.Add(v);
 				}
 
-				return (IPlugin)ci.Invoke([..paramList]);
+				return (IPlugin)ci.Invoke([.. paramList]);
 			}
 
 			bool updated = pluginTypes.Count != 0;
@@ -137,6 +147,8 @@ internal class PluginManager
 
 							_loadedPlugins.TryRemove(oldPlugin, out loadState);
 						}
+
+						loadState |= pluginType.GetCustomAttributes().Any(a => a is EnabledAttribute);
 
 						_loadedPlugins[plugin] = loadState;
 						_injectionDict[pluginType] = plugin;

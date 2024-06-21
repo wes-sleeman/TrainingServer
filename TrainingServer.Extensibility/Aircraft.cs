@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace TrainingServer.Extensibility;
 
@@ -19,7 +20,21 @@ public record Aircraft(DateTimeOffset Time, FlightData Metadata, AircraftSnapsho
 /// <param name="Heading">The heading of the aircraft in degrees from true North.</param>
 /// <param name="Altitude">The altitude of the aircraft in feet above the WGS-84 reference spheroid.</param>
 /// <param name="Position">The coordinates of the aircraft on the WGS-84 reference spheroid.</param>
-public record struct AircraftSnapshot(float Heading, int Altitude, Coordinate Position, Squawk Squawk) { }
+public record struct AircraftSnapshot
+{
+	public float Heading { get; set; }
+	public int Altitude { get; set; }
+	public Coordinate Position { get; set; }
+	public Squawk Squawk { get; set; }
+
+	public AircraftSnapshot(float heading, int altitude, Coordinate position, Squawk squawk)
+	{
+		Heading = (heading % 360 + 360) % 360;
+		Altitude = altitude;
+		Position = position;
+		Squawk = squawk;
+	}
+}
 
 /// <summary>The in-motion state of the aircraft containing no time or planning information.</summary>
 /// <remarks>For point-in-time information, use <seealso cref="AircraftSnapshot"/>.</remarks>
@@ -32,7 +47,7 @@ public record struct AircraftMotion(uint Speed, int ClimbRate, float TurnRate)
 	{
 		if (TurnRate == 0)
 			return source with {
-				Heading = source.Heading,
+				Heading = source.Heading % 360,
 				Altitude = source.Altitude + (int)(ClimbRate * duration.TotalSeconds),
 				Position = source.Position.FixRadialDistance(source.Heading, (float)duration.TotalHours * Speed) 
 			};
@@ -45,7 +60,7 @@ public record struct AircraftMotion(uint Speed, int ClimbRate, float TurnRate)
 			{
 				source = source with { 
 					Position = source.Position.FixRadialDistance(source.Heading, Speed / hoursPerResolution),
-					Heading = source.Heading + (float)(resolution.TotalSeconds * TurnRate),
+					Heading = (source.Heading + (float)(resolution.TotalSeconds * TurnRate) + 360) % 360,
 				};
 			}
 

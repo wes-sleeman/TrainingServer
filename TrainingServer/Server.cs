@@ -13,6 +13,7 @@ internal class Server : IServer
 	public event Action<ControllerUpdate>? OnControllerUpdated;
 	public event Action<Guid>? OnControllerAdded;
 	public event Action<TextMessage>? OnTextMessageReceived;
+	public event Action<TextMessage>? OnTextMessageSent;
 
 	public IDictionary<Guid, Aircraft> Aircraft => _aircraft;
 	public IDictionary<Guid, Controller> Controllers => _controllers;
@@ -75,6 +76,9 @@ internal class Server : IServer
 		return true;
 	}
 
+	public void SendTextMessage(Guid sender, Guid recipient, string message) => OnTextMessageSent?.Invoke(new(sender, recipient, message));
+	public void SendChannelMessage(decimal channel, string message) => OnTextMessageSent?.Invoke(new TextMessage(Guid.Empty, new($"{channel * 1000:00000000}-0000-0000-0000-000000000000"), message));
+
 	public async Task MessageReceivedAsync(NetworkMessage message)
 	{
 		_batchingEvent.Wait();
@@ -85,7 +89,9 @@ internal class Server : IServer
 				if (_controllers.TryGetValue(cupd.Controller, out var c))
 				{
 					_controllers[cupd.Controller] = c + cupd;
-					OnControllerUpdated?.Invoke(cupd);
+
+					if (_controllers[cupd.Controller].Position != c.Position)
+						OnControllerUpdated?.Invoke(cupd);
 				}
 				else
 				{
@@ -116,7 +122,7 @@ internal class Server : IServer
 		_batchingEvent.Reset();
 		Dictionary<Guid, Aircraft> newAircraft = new(_aircraft);
 
-		AircraftUpdate[] updates = [.._updateBatch.Values];
+		AircraftUpdate[] updates = [.. _updateBatch.Values];
 		_updateBatch.Clear();
 		_batchingEvent.Set();
 

@@ -1,12 +1,13 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 
 using TrainingServer.Extensibility;
 
 namespace TrainingServer.Connector;
 
-internal class FsdNegotiator
+internal partial class FsdNegotiator
 {
 	public event Action<StreamWriter, string[]>? PacketReceived;
 
@@ -33,10 +34,14 @@ internal class FsdNegotiator
 
 	public string GetCallsign(Guid user)
 	{
+		if (user == Guid.Empty)
+			return "SERVER";
 		if (Aircraft.TryGetValue(user, out Aircraft? ac))
 			return ac.Metadata.Callsign;
 		else if (Controllers.TryGetValue(user, out Controller? c))
 			return c.Metadata.Callsign;
+		else if (FrequencyGuidRegex().Match(user.ToString()) is Match m && m.Success)
+			return $"@{m.Groups[1].Value[3..]}";
 		else
 			throw new ArgumentException("Could not find user with the provided GUID.", nameof(user));
 	}
@@ -66,7 +71,7 @@ internal class FsdNegotiator
 
 	public void MessageReceived(string from, string to, string message)
 	{
-		Distribute?.Invoke($"#{from.Replace(":", "$C")}:{to.Replace(":", "$C")}:{message.Replace(":", "$C")}");
+		Distribute?.Invoke($"#TM{from.Replace(":", "$C")}:{to.Replace(":", "$C")}:{message.Replace(":", "$C")}");
 	}
 
 	async Task ClientConnectedAsync(TcpClient client)
@@ -143,7 +148,7 @@ internal class FsdNegotiator
 			Distribute?.Invoke($"=A{Callsign}:{aircraft.Metadata.Callsign}");
 		}
 
-			foreach (Controller c in newControllers)
+		foreach (Controller c in newControllers)
 			Distribute?.Invoke($"#AA{c.Metadata.Callsign}:{Callsign}:Another User:111111::6");
 
 		prevAircraft = [.. Aircraft.Values];
@@ -154,7 +159,7 @@ internal class FsdNegotiator
 		string[] updates =
 			Aircraft.Values
 			.Select(ac => ac.Extrapolate(extrapolationOffset))
-			.Select(ac => $"@{ac.Position.Squawk.Mode switch { Squawk.SquawkMode.Altitude => "N", _ => "S" }}:{ac.Metadata.Callsign}:{ac.Position.Squawk.Code}:6:{ac.Position.Position.Latitude}:{ac.Position.Position.Longitude}:{ac.Position.Altitude}:{ac.Movement.Speed}:{TupleToPBH((0, 0, ac.Position.Heading, false))}:0")
+			.Select(ac => $"@{ac.Position.Squawk.Mode switch { Squawk.SquawkMode.Altitude => "N", _ => "S" }}:{ac.Metadata.Callsign}:{ac.Position.Squawk.Code:0000}:6:{ac.Position.Position.Latitude}:{ac.Position.Position.Longitude}:{ac.Position.Altitude}:{ac.Movement.Speed}:{TupleToPBH((0, 0, ac.Position.Heading, false))}:0")
 			.ToArray();
 
 		if (Distribute is not null)
@@ -197,4 +202,7 @@ internal class FsdNegotiator
 			_ = Task.Run(async () => await ClientConnectedAsync(await _listener.AcceptTcpClientAsync()));
 		}
 	}
+
+	[GeneratedRegex(@"^(\d{8})-0000-0000-0000-000000000000$", RegexOptions.Compiled | RegexOptions.Singleline)]
+	private static partial Regex FrequencyGuidRegex();
 }

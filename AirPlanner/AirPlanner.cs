@@ -1,8 +1,10 @@
-﻿using TrainingServer.Extensibility;
+﻿using System.Diagnostics.CodeAnalysis;
+
+using TrainingServer.Extensibility;
 
 namespace AirPlanner;
 
-[Hidden]
+[Hidden, Enabled]
 public class AirPlanner(IServer server) : IPlugin
 {
 	public string Name => "Airborne Planner";
@@ -79,7 +81,7 @@ public class AirPlanner(IServer server) : IPlugin
 
 		_pendingSkips.Clear();
 
-		foreach (var (ac, i) in _ongoingInstructions)
+		foreach (var (ac, i) in _ongoingInstructions.ToArray())
 		{
 			Aircraft current = _server.Aircraft[ac].Extrapolate(DateTimeOffset.Now);
 			bool modified = false;
@@ -169,6 +171,22 @@ public class AirPlanner(IServer server) : IPlugin
 			_ongoingInstructions[aircraft] = i;
 	}
 
+	/// <summary>Instructs the <paramref name="aircraft"/> to pause its current route and fly the specified <paramref name="vector"/>.</summary>
+	/// <param name="aircraft">The <see cref="Guid"/> of the aircraft being vectored.</param>
+	/// <param name="vector">The <see cref="Instruction"/> to fly.</param>
+	/// <remarks>The aircraft will resume its previous route if the vector is <see cref="Skip(Guid)">skipped</see>.</remarks>
+	public void Vector(Guid aircraft, Instruction vector)
+	{
+		// Add the vector to the beginning of the route.
+		_filedRoutes[aircraft] =
+			_filedRoutes.TryGetValue(aircraft, out var prevRoute)
+			? new([vector, ..prevRoute])
+			: new([vector]);
+
+		_pendingSkips.Remove(aircraft);
+		_ongoingInstructions[aircraft] = vector;
+	}
+
 	/// <summary>Instructs the given <paramref name="aircraft"/> to move on to the next instruction.</summary>
 	public void Skip(Guid aircraft)
 	{
@@ -178,5 +196,16 @@ public class AirPlanner(IServer server) : IPlugin
 		if (!_pendingSkips.Add(aircraft))
 			// Trying to skip multiple... Not sure if we want to batch these to prevent it, but for now just let them do it.
 			curRoute.Dequeue();
+	}
+
+	/// <summary>Gets the filed route for the specified <paramref name="aircraft"/>.</summary>
+	/// <exception cref="KeyNotFoundException"/>
+	public IEnumerable<Instruction> this[Guid aircraft] => _filedRoutes[aircraft];
+
+	public bool TryGetValue(Guid aircraft, [NotNullWhen(true)] out IEnumerable<Instruction>? instructions)
+	{
+		bool retval = _filedRoutes.TryGetValue(aircraft, out var instr);
+		instructions = instr;
+		return retval;
 	}
 }

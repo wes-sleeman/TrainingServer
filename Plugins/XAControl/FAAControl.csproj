@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\AirPlanner\AirPlanner.csproj" />
+    <ProjectReference Include="..\..\TrainingServer.Extensibility\TrainingServer.Extensibility.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="CIFPReader">
+      <HintPath>..\..\..\CIFPReader\bin\Debug\net8.0\CIFPReader.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

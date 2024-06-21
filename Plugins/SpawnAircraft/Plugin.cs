@@ -25,12 +25,12 @@ public partial class Plugin : IPlugin
 		//));
 	}
 
-	public async Task ProcessTextMessageAsync(string sender, string recipient, string message)
+	public Task ProcessTextMessageAsync(string sender, string recipient, string message)
 	{
 		message = message.Trim().ToUpperInvariant();
 
 		if (!recipient.Equals("123.45") || !SpawnRegex().IsMatch(message))
-			return;
+			return Task.CompletedTask;
 
 		var matchGroups = SpawnRegex().Match(message).Groups;
 		_server.AddAircraft(new(
@@ -39,7 +39,7 @@ public partial class Plugin : IPlugin
 			movement: new(200, -10, 3)
 		));
 
-		await Task.CompletedTask;
+		return Task.CompletedTask;
 	}
 
 	public Task TickAsync(TimeSpan delta) => Task.CompletedTask;

@@ -25,6 +25,12 @@ public interface IServer
 	/// <returns>The array of all <see cref="Aircraft"/> found and removed.</returns>
 	public Guid[] RemoveAircraft(string callsign);
 
+	/// <summary>Sends a text <paramref name="message"/> to the specified <paramref name="recipient"/>.</summary>
+	public void SendTextMessage(Guid sender, Guid recipient, string message);
+
+	/// <summary>Sends a text <paramref name="message"/> to the specified <paramref name="channel"/>.</summary>
+	public void SendChannelMessage(decimal channel, string message);
+
 	/// <summary>Gets all <see cref="Aircraft"/> with the given callsign.</summary>
 	/// <param name="callsign">The callsign of the <see cref="Aircraft"/> to find.</param>
 	/// <returns>All <see cref="Aircraft"/> with the given callsign.</returns>

@@ -59,10 +59,33 @@ public partial class FrmMain : Form
 
 	private void ServerPacketReceived(DateTimeOffset sent, NetworkMessage message)
 	{
+		static uint TupleToPBH((decimal Pitch, decimal Bank, decimal Heading, bool OnGround) PBH)
+		{
+			uint TenBitMask = 0b00000011_11111111;
+
+			static ushort scale(decimal value) => (ushort)((value + 360) % 360 * 128m / 45);
+
+			uint retval = scale(PBH.Pitch) & TenBitMask;
+			retval <<= 10;
+			retval += scale(PBH.Bank) & TenBitMask;
+			retval <<= 10;
+			retval += scale(PBH.Heading) & TenBitMask;
+			retval <<= 1;
+			retval += (uint)(PBH.OnGround ? 1 : 0);
+			retval <<= 1;
+
+			return retval;
+		}
+
 		switch (message)
 		{
 			case AircraftUpdate acu:
 				_client.Aircraft.AddOrUpdate(acu.Aircraft, acu.ToAircraft(), (_, ac) => ac + acu);
+				var ac = _client.Aircraft[acu.Aircraft].Extrapolate(DateTimeOffset.Now.AddSeconds(-1));
+				_client.Send($"@{ac.Position.Squawk.Mode switch {
+					Extensibility.Squawk.SquawkMode.Altitude => "N",
+					_ => "S"
+				}}{ac.Metadata.Callsign}:{ac.Position.Squawk.Code:0000}::{ac.Position.Position.Latitude}:{ac.Position.Position.Longitude}:{ac.Position.Altitude}:{ac.Movement.Speed}:{TupleToPBH((0, 0, (decimal)ac.Position.Heading, false))}:0");
 				break;
 
 			case ControllerUpdate cu:

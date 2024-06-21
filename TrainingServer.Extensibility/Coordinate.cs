@@ -150,6 +150,7 @@ public record struct Coordinate(float Latitude, float Longitude)
 		return new((float)phi2, (float)L2);
 	}
 
+	/// <summary>Gets the bearing (in degrees, null if distance is zero) and distance (in nmi) to a specified point.</summary>
 	[DebuggerStepThrough]
 	public readonly (float? bearing, float distance) GetBearingDistance(Coordinate other)
 	{
@@ -232,6 +233,7 @@ public record struct Coordinate(float Latitude, float Longitude)
 		return ((float)(alpha_1 * RAD_TO_DEG), (float)s);
 	}
 
+	/// <summary>Returns the distance (in nmi) to some other point.</summary>
 	[DebuggerStepThrough]
 	public readonly float DistanceTo(Coordinate other)
 	{

@@ -57,16 +57,34 @@ public sealed class WebsocketMonitor : IAsyncDisposable
 
 					if (receiveResult.EndOfMessage)
 					{
+						string msg = messageText.ToString();
+
+						if (msg.StartsWith('{'))
+						{
+							int braceCounter = 0;
+							msg = new([..msg.TakeWhile(c => {
+								if (c == '}' && braceCounter == 1)
+									return false;
+
+								if (c == '{')
+									++braceCounter;
+								else if (c == '}')
+									--braceCounter;
+
+								return true;
+							}), '}']);
+						}
+
 						if (InterceptSingleText is not null)
-							InterceptSingleText.Invoke(messageText.ToString());
+							InterceptSingleText.Invoke(msg);
 						else if (OnTextMessageReceived is not null)
-							OnTextMessageReceived.Invoke(messageText.ToString());
+							OnTextMessageReceived.Invoke(msg);
 						else
 						{
 							while (InterceptSingleText is null)
 								Thread.Yield();
 
-							InterceptSingleText.Invoke(messageText.ToString());
+							InterceptSingleText.Invoke(msg);
 						}
 
 						InterceptSingleText = null;

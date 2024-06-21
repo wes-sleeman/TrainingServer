@@ -63,7 +63,7 @@ public partial class FrmMain : Form
 			Invoke(() => Text = $"Training Server (Connected: {guid})");
 
 			// Send your server name.
-			await socket.SendAsync($"{guid}|{Environment.UserName}'s Server");
+			await socket.SendAsync($"{guid}|{guid}");
 
 			// Update the UI.
 			BtnStart.Invoke(() =>
@@ -99,13 +99,17 @@ public partial class FrmMain : Form
 						sender = ac.Metadata.Callsign;
 						break;
 
+					case null when txt.From == Guid.Empty:
+						sender = "SERVER";
+						break;
+
 					default:
 						return;
 				}
 
-				if (FrequencyGuidRegex().IsMatch(txt.To.ToString()))
+				if (FrequencyGuidRegex().Match(txt.To.ToString()) is Match m && m.Success)
 					recipient =
-						(decimal.Parse(FrequencyGuidRegex().Match(txt.To.ToString()).Groups[1].Value) / 1000m)
+						(decimal.Parse(m.Groups[1].Value) / 1000m)
 							   .ToString("000.00#");
 				else if (server.ResolveGuid(txt.To) is Controller c)
 					recipient = c.Metadata.Callsign;
@@ -117,6 +121,8 @@ public partial class FrmMain : Form
 
 				await manager.ProcessTextMessageAsync(sender, recipient, txt.Message);
 			};
+
+			server.OnTextMessageSent += async txt => await socket.SendAsync(txt);
 
 			server.OnAircraftAdded += async g =>
 			{
@@ -160,6 +166,7 @@ public partial class FrmMain : Form
 								[.. server.Aircraft.Select(ac => new AircraftUpdate(ac.Key, ac.Value))]
 							)))
 						);
+						lastAuthoritativeUpdate = DateTimeOffset.Now;
 					}
 				}),
 				PollPluginsAsync()
