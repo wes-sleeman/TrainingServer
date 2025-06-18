@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AirPlanner", "AirPlanner\Ai
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FAAControl", "Plugins\XAControl\FAAControl.csproj", "{90102D4D-A162-44D3-8E2D-CBC4D156C659}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TSLink", "Plugins\TSLink\TSLink.csproj", "{07D31AD2-3757-467D-9BC6-F73E5084F517}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -77,6 +79,10 @@ Global
 		{90102D4D-A162-44D3-8E2D-CBC4D156C659}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{90102D4D-A162-44D3-8E2D-CBC4D156C659}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{90102D4D-A162-44D3-8E2D-CBC4D156C659}.Release|Any CPU.Build.0 = Release|Any CPU
+		{07D31AD2-3757-467D-9BC6-F73E5084F517}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07D31AD2-3757-467D-9BC6-F73E5084F517}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07D31AD2-3757-467D-9BC6-F73E5084F517}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07D31AD2-3757-467D-9BC6-F73E5084F517}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -87,6 +93,7 @@ Global
 		{02BDEB9B-A51F-48EF-B409-94CEAA7DE7CA} = {2C60B149-4272-4C05-8BE8-FBBBDC510C31}
 		{9C7A6220-DE07-4410-A1F2-E3EFE761B14E} = {2C60B149-4272-4C05-8BE8-FBBBDC510C31}
 		{90102D4D-A162-44D3-8E2D-CBC4D156C659} = {2C60B149-4272-4C05-8BE8-FBBBDC510C31}
+		{07D31AD2-3757-467D-9BC6-F73E5084F517} = {2C60B149-4272-4C05-8BE8-FBBBDC510C31}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {83BEFDE6-00DF-45E0-9A54-3FCFE1E004E9}

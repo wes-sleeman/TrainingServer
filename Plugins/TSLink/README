@@ -1,0 +1,9 @@
+# TS Interop Shim
+
+This project allows connection with Typescript plugins (as well as, in theory, plugins written in any other language with STDIO and JSON serialisation).
+To begin:
+1. Build this project.
+1. Copy the dll to your server folder.
+1. Create a `ts-shim-settings.json` file in that folder.
+1. Populate the file with an object implementing the `Settings` interface.
+1. Run the server, enable the plugin, and see if it works!
