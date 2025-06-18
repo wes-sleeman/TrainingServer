@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <Reference Include="CIFPReader">
-      <HintPath>..\..\..\CIFPReader\bin\Debug\net8.0\CIFPReader.dll</HintPath>
+      <HintPath>..\..\CIFPReader\bin\Release\net7.0\CIFPReader.dll</HintPath>
     </Reference>
   </ItemGroup>
 

@@ -61,11 +61,11 @@ public partial class FAAControl(IServer _server, AirPlanner.AirPlanner _planner)
 			{
 				int altMsl = int.Parse(alt.Groups["alt"].Value) * 100;
 				altRes = alt.Groups["type"].Value switch {
-					"@" => new AltitudeRestriction(altMsl, altMsl),					// At
-					"c" when ac.Position.Altitude < altMsl => new(altMsl, altMsl),	// Climb
-					"d" when ac.Position.Altitude > altMsl => new(altMsl, altMsl),	// Descend
-					"a" => new(altMsl, null),										// At or above
-					"b" => new(null, altMsl),										// At or below
+					"@" => new AltitudeRestriction(altMsl, altMsl),                 // At
+					"c" when ac.Position.Altitude < altMsl => new(altMsl, altMsl),  // Climb
+					"d" when ac.Position.Altitude > altMsl => new(altMsl, altMsl),  // Descend
+					"a" => new(altMsl, null),                                       // At or above
+					"b" => new(null, altMsl),                                       // At or below
 					_ => AltitudeRestriction.Empty
 				};
 			}
@@ -75,9 +75,9 @@ public partial class FAAControl(IServer _server, AirPlanner.AirPlanner _planner)
 			{
 				uint spdKts = uint.Parse(spd.Groups["speed"].Value);
 				spdRes = spd.Groups["type"].Value switch {
-					"@" => new SpeedRestriction(spdKts, spdKts),	// At
-					"a" => new(spdKts, null),						// No slower than
-					"b" => new(null, spdKts),						// No faster than
+					"@" => new SpeedRestriction(spdKts, spdKts),    // At
+					"a" => new(spdKts, null),                       // No slower than
+					"b" => new(null, spdKts),                       // No faster than
 					_ => SpeedRestriction.Empty
 				};
 			}
@@ -116,11 +116,26 @@ public partial class FAAControl(IServer _server, AirPlanner.AirPlanner _planner)
 			else
 				_planner.Vector(guid, vector);
 
+			if (checkMatch(_ProcedureMessage()) is Match procMatch && _cifp.Procedures.TryGetValue(procMatch.Groups[1].Value, out var procs))
+			{
+				Procedure proc = procs.MinBy(p =>
+				{
+					if (p.SelectAllRoutes(_cifp.Fixes).FirstOrDefault(i => i?.Endpoint is NamedCoordinate)?.Endpoint is not NamedCoordinate nc ||
+						ResolveWaypoint(nc.Name, ac.Position.Position) is not Coordinate c)
+						return float.MaxValue;
+
+					return ac.Position.Position.DistanceTo(c);
+				}) ?? procs.First();
+
+				_planner.SetRoute(guid, proc.SelectRoute(null, null).Select(ConvertCifpInstruction));
+				resp += $" Cleared {proc.Name}.";
+			}
+
 			if (checkMatch(_SquawkMessage()) is Match sq)
 			{
 				ushort squawkCode = ushort.Parse(sq.Groups["code"].Value);
 				_server.UpdateAircraft(guid, ac with { Time = ac.Time, Position = ac.Position with { Squawk = new(squawkCode, Squawk.SquawkMode.Altitude) } });
-				resp += $" Squawk {squawkCode:0000}."; 
+				resp += $" Squawk {squawkCode:0000}.";
 			}
 
 			foreach (var controller in _server.Controllers.Where(c => c.Value.Metadata.Callsign == sender))
@@ -141,6 +156,34 @@ public partial class FAAControl(IServer _server, AirPlanner.AirPlanner _planner)
 		return possibleCoords
 			.Select(ic => { var oldCoord = ic.GetCoordinate(); return new Coordinate((float)oldCoord.Latitude, (float)oldCoord.Longitude); })
 			.MinBy(c => c.DistanceTo(referencePosition));
+	}
+
+	private Instruction ConvertCifpInstruction(Procedure.Instruction instr)
+	{
+		LnavInstruction? lnavInstr = null;
+		Termination termination = Termination.Forever;
+
+		if (instr.Termination.HasFlag(ProcedureLine.PathTermination.UntilCrossing) && instr.Endpoint is ICoordinate epCoord)
+		{
+			var oldCoord = epCoord.GetCoordinate();
+			lnavInstr = new Direct(new Coordinate((double)oldCoord.Latitude, (double)oldCoord.Longitude));
+			termination = Termination.Crossing;
+		}
+		else if (
+			(instr.Termination.HasFlag(ProcedureLine.PathTermination.Course) ||
+			 instr.Termination.HasFlag(ProcedureLine.PathTermination.Track) ||
+			 instr.Termination.HasFlag(ProcedureLine.PathTermination.Heading)) &&
+			 instr.Via is Course hdgCrs)
+			lnavInstr = new Heading((float)hdgCrs.ToTrue().Degrees);
+		else
+			System.Diagnostics.Debugger.Break();
+
+		return new(
+			lnavInstr ?? new PresentHeading(),
+			new AltitudeRestriction(instr.Altitude.Minimum?.Feet, instr.Altitude.Maximum?.Feet),
+			new SpeedRestriction(instr.Speed.Minimum, instr.Speed.Maximum),
+			termination
+		);
 	}
 
 	public Task TickAsync(TimeSpan delta) => Task.CompletedTask;

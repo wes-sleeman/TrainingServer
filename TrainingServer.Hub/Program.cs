@@ -1,5 +1,8 @@
 using TrainingServer.Hub.Data;
 
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile("wwwroot/appsettings.json");

@@ -48,23 +48,24 @@ public record struct AircraftMotion(uint Speed, int ClimbRate, float TurnRate)
 		if (TurnRate == 0)
 			return source with {
 				Heading = source.Heading % 360,
-				Altitude = source.Altitude + (int)(ClimbRate * duration.TotalSeconds),
-				Position = source.Position.FixRadialDistance(source.Heading, (float)duration.TotalHours * Speed) 
+				Altitude = source.Altitude + (int)(ClimbRate * duration.TotalMinutes),
+				Position = source.Position.FixRadialDistance(source.Heading, (float)duration.TotalHours * Speed)
 			};
 		else
 		{
-			TimeSpan resolution = TimeSpan.FromSeconds(0.25);
-			float hoursPerResolution = (float)(TimeSpan.FromHours(1) / resolution);
+			double headingRadians = source.Heading * Math.PI / 180;
+			double turnRadiansPerSec = TurnRate * Math.PI / 180;
+			double durationSec = duration.TotalSeconds;
+			double velocity = Speed * 0.016696588 * Math.Cos(source.Position.Latitude * Math.PI / 180); // Knots to degrees per second
+			double radius = velocity / turnRadiansPerSec;
+			var (sinUnitCircle, cosUnitCircle) = Math.SinCos(durationSec * turnRadiansPerSec + headingRadians);
+			double deltaLat = radius * sinUnitCircle * 180 / Math.PI, deltaLon = radius * cosUnitCircle * 180 / Math.PI;
 
-			for (int iter = 0; iter < duration / resolution; ++iter)
-			{
-				source = source with { 
-					Position = source.Position.FixRadialDistance(source.Heading, Speed / hoursPerResolution),
-					Heading = (source.Heading + (float)(resolution.TotalSeconds * TurnRate) + 360) % 360,
-				};
-			}
-
-			return source with { Altitude = source.Altitude + (int)(ClimbRate * duration.TotalSeconds) };
+			return source with {
+				Altitude = source.Altitude + (int)(ClimbRate * duration.TotalMinutes),
+				Position = new(source.Position.Latitude + deltaLat, source.Position.Longitude + deltaLon),
+				Heading = (float)((source.Heading + TurnRate * durationSec + 360) % 360)
+			};
 		}
 	}
 }
@@ -78,7 +79,7 @@ public record struct AircraftMotion(uint Speed, int ClimbRate, float TurnRate)
 /// <param name="Route">The filed route of flight.</param>
 /// <param name="Remarks">Pilot-supplied remarks for the flight.</param>
 public record struct FlightData(string Callsign, string Origin, string Destination, FlightData.FlightRules Rules, string Type, string Route, string Remarks)
-{ 
+{
 	public enum FlightRules
 	{
 		VFR,

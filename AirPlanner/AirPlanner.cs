@@ -98,10 +98,12 @@ public class AirPlanner(IServer server) : IPlugin
 				case Direct d:
 					// Check if we're already pointing the right way.
 					float bearingToStation = current.Position.Position.GetBearingDistance(d.Endpoint).bearing ?? current.Position.Heading;
+					bearingToStation += 360f;
+					bearingToStation %= 360f;
 					if (Math.Abs(bearingToStation - current.Position.Heading) < 1f)
 					{
 						modified |= current.Movement.TurnRate != 0;
-						current = current with { Movement = current.Movement with { TurnRate = 0 } };
+						current = current with { Position = current.Position with { Heading = bearingToStation }, Movement = current.Movement with { TurnRate = 0 } };
 						break;
 					}
 

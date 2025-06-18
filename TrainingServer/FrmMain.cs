@@ -211,7 +211,7 @@ public partial class FrmMain : Form
 	private void FrmMain_FormClosing(object sender, FormClosingEventArgs e)
 	{
 		if (BtnStart.Text == "Disconnect" && socket is not null)
-			Task.Run(async () => await socket.DisposeAsync(WebSocketCloseStatus.NormalClosure, "Good day!")).RunSynchronously();
+			socket.DisposeAsync(WebSocketCloseStatus.NormalClosure, "Good day!").AsTask().Wait();
 	}
 
 	private void Manager_OnPluginsListUpdated()
